@@ -5,9 +5,10 @@
   --text: #e8ecf4;
   --dim: #8089a0;
   --accent: #7df3e1;
-  --pos: 77, 155, 255;   /* azul */
-  --neg: 255, 93, 93;    /* rojo */
-  --neu: 128, 137, 160;  /* gris */
+  --pos: 166, 200, 245;  /* azul pastel */
+  --neg: 246, 172, 172;  /* rojo pastel */
+  --neu: 202, 206, 216;  /* gris pastel */
+  --ink: #1d2230;        /* texto sobre los círculos */
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); overflow: hidden; }
@@ -59,23 +60,22 @@ header { position: relative; flex: none; display: flex; justify-content: center;
 .bubble.neg { --c: var(--neg); }
 .bubble.neu { --c: var(--neu); }
 .bubble.open { z-index: 2; }
-.has-selected .bubble:not(.open) { opacity: 0.22; }
+.has-selected .bubble:not(.open) { opacity: 0.18; }
 
 .skin {
   width: 100%; height: 100%; border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, rgba(var(--c), 0.5), rgba(var(--c), 0.24) 70%);
-  border: 1.5px solid rgba(var(--c), 0.85);
+  background: rgb(var(--c)); color: var(--ink);
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   text-align: center; overflow: hidden;
 }
 button.skin { transition: filter 0.15s; }
-button.skin:hover { filter: brightness(1.25); }
+button.skin:hover { filter: brightness(1.08); }
 button.skin:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
 .name {
   max-width: 82%; font-weight: 600; line-height: 1.1; overflow-wrap: anywhere;
   font-size: clamp(10px, calc(var(--r) * 0.3px), 26px);
 }
-.count { color: rgba(255, 255, 255, 0.65); font-variant-numeric: tabular-nums; font-size: clamp(9px, calc(var(--r) * 0.22px), 18px); }
+.count { color: rgba(29, 34, 48, 0.6); font-variant-numeric: tabular-nums; font-size: clamp(9px, calc(var(--r) * 0.22px), 18px); }
 
 /* Llega un texto nuevo: resplandor + palpitación (el tamaño crece solo al subir la cuenta) */
 .bubble.pulse .skin { animation: pulse 0.9s ease-in-out 5; }
@@ -87,20 +87,19 @@ button.skin:focus-visible { outline: 2px solid var(--text); outline-offset: 2px;
 /* Círculo abierto: lista de textos */
 .detail {
   justify-content: flex-start; padding: 13% 15% 12%;
-  background: radial-gradient(circle at 35% 25%, rgba(var(--c), 0.34), #10131a 75%);
-  box-shadow: 0 0 60px rgba(var(--c), 0.28);
+  box-shadow: 0 0 60px rgba(var(--c), 0.3);
 }
 .detail .title { flex: none; font-size: 20px; font-weight: 700; margin-bottom: 10px; }
-.detail .title span { color: var(--dim); font-weight: 500; margin-left: 4px; }
+.detail .title span { color: rgba(29, 34, 48, 0.55); font-weight: 500; margin-left: 4px; }
 .detail ul {
   list-style: none; margin: 0; padding: 0 4px 12px; width: 100%; overflow-y: auto; text-align: left;
-  display: flex; flex-direction: column; gap: 10px; scrollbar-width: thin; scrollbar-color: var(--line) transparent;
+  display: flex; flex-direction: column; gap: 10px; scrollbar-width: thin; scrollbar-color: rgba(29, 34, 48, 0.3) transparent;
 }
-.detail li { padding-left: 12px; border-left: 3px solid rgb(var(--neu)); }
-.detail li.positivo { border-left-color: rgb(var(--pos)); }
-.detail li.negativo { border-left-color: rgb(var(--neg)); }
+.detail li { padding-left: 12px; border-left: 4px solid #8f96a8; }
+.detail li.positivo { border-left-color: #4f86d6; }
+.detail li.negativo { border-left-color: #d9605f; }
 .detail li p { margin: 0; font-size: 15px; overflow-wrap: anywhere; }
-.detail li time { color: var(--dim); font-size: 11px; }
+.detail li time { color: rgba(29, 34, 48, 0.55); font-size: 11px; }
 
 @media (max-width: 520px) {
   .face { width: 104px; height: 60px; gap: 16px; }
