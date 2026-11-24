@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { classificationInfo } from "@/lib/classify";
+import { ASSUMED, llmCost, PRICES_CHECKED, sttCost } from "@/lib/pricing";
 import { persistent } from "@/lib/store";
 import { transcriptionInfo } from "@/lib/transcribe";
 
@@ -11,12 +12,14 @@ function Step({
   title,
   where,
   chip,
+  cost,
   children,
 }: {
   n: number;
   title: string;
   where: string;
   chip?: string;
+  cost?: string;
   children: React.ReactNode;
 }) {
   return (
@@ -28,10 +31,23 @@ function Step({
           <span className="where">{where}</span>
         </div>
         <p>{children}</p>
-        {chip && <span className="chip">{chip}</span>}
+        {(chip || cost) && (
+          <div className="chips-row">
+            {chip && <span className="chip">{chip}</span>}
+            {cost && <span className={`cost${cost === FREE ? " free" : ""}`}>{cost}</span>}
+          </div>
+        )}
       </div>
     </li>
   );
+}
+
+const FREE = "Sin coste";
+
+/** Importes muy pequeños en dólares, con las cifras justas para que se lean. */
+function usd(n: number): string {
+  const digits = n >= 1 ? 2 : n >= 0.01 ? 3 : n >= 0.0001 ? 5 : 6;
+  return `US$ ${n.toLocaleString("es", { minimumFractionDigits: 2, maximumFractionDigits: digits })}`;
 }
 
 function Branch({ children }: { children: React.ReactNode }) {
@@ -41,6 +57,15 @@ function Branch({ children }: { children: React.ReactNode }) {
 export default function Doc() {
   const stt = transcriptionInfo();
   const llm = classificationInfo();
+
+  // Estimación con los modelos configurados; sin clave, con los que se usarían con OpenAI.
+  const sttModel = stt?.model ?? "whisper-1";
+  const llmModel = llm?.model ?? "gpt-4.1-nano";
+  const sttC = sttCost(sttModel);
+  const llmC = llmCost(llmModel);
+  const total = (sttC?.usd ?? 0) + (llmC?.usd ?? 0);
+  const perPhrase = (c: { usd: number } | null) => (c ? `≈ ${usd(c.usd)} por frase` : "Precio no disponible");
+  const unverified = [sttC && !sttC.verified && sttModel, llmC && !llmC.verified && llmModel].filter(Boolean);
 
   return (
     <main className="doc">
@@ -109,14 +134,14 @@ export default function Doc() {
         </p>
 
         <ol className="flow">
-          <Step n={1} title="Escucha y grabación" where="Dispositivo">
+          <Step n={1} title="Escucha y grabación" where="Dispositivo" cost={FREE}>
             El micrófono se lee sin parar. Cuando el volumen supera el ruido de fondo empieza a grabar, y corta tras
             1,2 s de silencio o a los 15 s. No interviene ningún modelo: es una regla de volumen.
           </Step>
-          <Step n={2} title="Envío del audio" where="Dispositivo → web">
+          <Step n={2} title="Envío del audio" where="Dispositivo → web" cost={FREE}>
             El audio viaja como un archivo WAV a <code>POST /api/audio</code>.
           </Step>
-          <Step n={3} title="¿Está en pausa?" where="Web">
+          <Step n={3} title="¿Está en pausa?" where="Web" cost={FREE}>
             Se mira el interruptor antes de gastar nada.
           </Step>
           <Branch>Si está en pausa: el audio se descarta, el dispositivo se duerme y el flujo termina aquí.</Branch>
@@ -125,12 +150,13 @@ export default function Doc() {
             title="Transcripción: voz a texto"
             where="Modelo 1"
             chip={stt ? `${stt.provider} · ${stt.model}` : "Sin clave configurada en este servidor"}
+            cost={perPhrase(sttC)}
           >
             El WAV se envía a un modelo Whisper, que devuelve la frase escrita. Se le indica el idioma esperado
             (español) para que acierte más.
           </Step>
           <Branch>Si no se reconoce ninguna palabra: no se guarda nada y el flujo termina aquí.</Branch>
-          <Step n={5} title="Categorías que ya existen" where="Web">
+          <Step n={5} title="Categorías que ya existen" where="Web" cost={FREE}>
             Se parte de seis temas fijos de un local de comida rápida (limpieza, atención, local, comida, variedad y
             bulla) y se añaden las categorías que se hayan ido creando, de la más frecuente a la menos.
           </Step>
@@ -143,6 +169,7 @@ export default function Doc() {
                 ? `${llm.provider} · ${llm.model}${llm.fallbacks.length ? ` (reserva: ${llm.fallbacks.join(", ")})` : ""}`
                 : "Sin clave configurada en este servidor"
             }
+            cost={perPhrase(llmC)}
           >
             Un modelo de chat pequeño recibe la frase y la lista de categorías existentes, con la indicación de que
             son comentarios de clientes en el local. Devuelve un JSON con el sentimiento (positivo, neutral o
@@ -157,14 +184,80 @@ export default function Doc() {
             title="Guardado: solo tema, tono y hora"
             where="Web"
             chip={persistent ? "Upstash Redis" : "Memoria del proceso (modo local)"}
+            cost={FREE}
           >
             A cada categoría devuelta se le suma un punto en su círculo del color correspondiente y se anota la fecha.
             Si la categoría es nueva, se crea. El texto y el audio se descartan aquí.
           </Step>
-          <Step n={8} title="Dibujo" where="Navegador">
+          <Step n={8} title="Dibujo" where="Navegador" cost={FREE}>
             La página consulta los datos cada 3 s y actualiza los círculos o la línea de 24 horas. Lo nuevo palpita.
           </Step>
         </ol>
+
+        <h3 className="sub">Coste estimado por frase</h3>
+        <p>
+          Solo cuestan los dos pasos que llaman a un modelo. La estimación supone una frase de {ASSUMED.seconds} s y,
+          para clasificar, unos {ASSUMED.inputTokens} tokens de entrada y {ASSUMED.outputTokens} de salida.
+        </p>
+        <div className="table">
+          <table>
+            <thead>
+              <tr>
+                <th>Paso</th>
+                <th>Cómo se cobra</th>
+                <th className="num">Por frase</th>
+                <th className="num">Por 1.000 frases</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>4 · Transcripción</td>
+                <td>
+                  <code>{sttModel}</code>, por duración del audio
+                </td>
+                <td className="num">{sttC ? usd(sttC.usd) : "—"}</td>
+                <td className="num">{sttC ? usd(sttC.usd * 1000) : "—"}</td>
+              </tr>
+              <tr>
+                <td>6 · Sentimiento y categorías</td>
+                <td>
+                  <code>{llmModel}</code>, por tokens
+                </td>
+                <td className="num">{llmC ? usd(llmC.usd) : "—"}</td>
+                <td className="num">{llmC ? usd(llmC.usd * 1000) : "—"}</td>
+              </tr>
+              <tr>
+                <td>Resto de pasos</td>
+                <td>Dispositivo, web y base de datos</td>
+                <td className="num">{usd(0)}</td>
+                <td className="num">{usd(0)}</td>
+              </tr>
+              <tr className="total">
+                <td>Total</td>
+                <td />
+                <td className="num">{usd(total)}</td>
+                <td className="num">{usd(total * 1000)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <ul>
+          <li>
+            La transcripción es casi todo el coste
+            {total > 0 && sttC ? ` (≈ ${Math.round((sttC.usd / total) * 100)} %)` : ""}: crece con los segundos de
+            audio, así que una frase de 15 s cuesta el triple que una de 5 s.
+          </li>
+          <li>Con el dispositivo en pausa no se llama a ningún modelo: el coste es cero.</li>
+          <li>
+            La web (Vercel) y la base de datos (Upstash) funcionan dentro de sus planes gratuitos con este uso; si se
+            superan sus límites, dejarían de ser gratis.
+          </li>
+          <li>
+            Precios publicados por los proveedores, consultados el {PRICES_CHECKED}.
+            {unverified.length > 0 &&
+              ` El de ${unverified.join(" y ")} no se pudo confirmar en la página oficial y es un valor de referencia.`}
+          </li>
+        </ul>
 
         <h3 className="sub">Por qué una sola llamada para clasificar</h3>
         <p>

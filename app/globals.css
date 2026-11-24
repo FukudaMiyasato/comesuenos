@@ -231,3 +231,14 @@ button.skin:focus-visible { outline: 2px solid var(--text); outline-offset: 2px;
 .doc th { color: var(--dim); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
 .doc td { color: #c3c9d6; }
 .doc td:first-child { color: var(--text); font-weight: 600; white-space: nowrap; }
+
+/* Coste por paso en el flujograma */
+.flow .chips-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.flow .chips-row .chip { margin-top: 0; }
+.flow .cost {
+  font: 12.5px ui-monospace, SFMono-Regular, Menlo, monospace; border-radius: 6px; padding: 3px 8px;
+  background: #2b2510; color: #f3d98b; border: 1px solid #6b5a1c;
+}
+.flow .cost.free { background: transparent; color: var(--dim); border-color: var(--line); }
+.doc th.num, .doc td.num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; padding-right: 0; padding-left: 12px; }
+.doc tr.total td { border-bottom: 0; border-top: 1px solid #3a4359; color: var(--text); font-weight: 700; }

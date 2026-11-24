@@ -1,6 +1,6 @@
 import type { Sentiment } from "./store";
 
-export type Classification = { sentiment: Sentiment; categories: string[] };
+export type Classification = { sentiment: Sentiment; categories: string[]; model: string };
 
 type Provider = { url: string; key: string; models: string[] };
 
@@ -95,7 +95,7 @@ export async function classify(text: string, existing: string[]): Promise<Classi
         if (!categories.includes(final)) categories.push(final);
         if (categories.length === 3) break;
       }
-      if (categories.length) return { sentiment, categories };
+      if (categories.length) return { sentiment, categories, model };
     } catch (err) {
       console.error(`respuesta de ${model} no válida:`, err);
     }

@@ -64,6 +64,7 @@ export async function POST(req: Request) {
   // Sin clasificación no hay nada que guardar: la frase se descarta.
   if (!tags) return Response.json({ ok: true, listening: true, classified: false, seconds });
 
+  // tags.model indica qué modelo respondió (el principal o el de reserva); no se guarda.
   await addMentions(data, tags.categories, tags.sentiment, Date.now());
   return Response.json({ ok: true, listening: true, ...tags, seconds });
 }
