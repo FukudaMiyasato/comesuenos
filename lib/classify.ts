@@ -11,7 +11,8 @@ function provider(): Provider | null {
     return {
       url: "https://api.openai.com/v1/chat/completions",
       key: process.env.OPENAI_API_KEY,
-      models: [...forced, "gpt-4.1-nano", "gpt-4o-mini"],
+      // gpt-4.1-nano ya no está disponible en esta cuenta: se comprobó que siempre respondía el de reserva.
+      models: [...forced, "gpt-4o-mini"],
     };
   }
   if (process.env.GROQ_API_KEY) {

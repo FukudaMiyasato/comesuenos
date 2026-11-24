@@ -60,7 +60,7 @@ export default function Doc() {
 
   // Estimación con los modelos configurados; sin clave, con los que se usarían con OpenAI.
   const sttModel = stt?.model ?? "whisper-1";
-  const llmModel = llm?.model ?? "gpt-4.1-nano";
+  const llmModel = llm?.model ?? "gpt-4o-mini";
   const sttC = sttCost(sttModel);
   const llmC = llmCost(llmModel);
   const total = (sttC?.usd ?? 0) + (llmC?.usd ?? 0);

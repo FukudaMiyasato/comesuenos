@@ -12,7 +12,6 @@ export const STT_PRICES: Record<string, { perMinute: number; verified: boolean }
 
 /** Chat: USD por millón de tokens de entrada y de salida. */
 export const LLM_PRICES: Record<string, { input: number; output: number; verified: boolean }> = {
-  "gpt-4.1-nano": { input: 0.1, output: 0.4, verified: false },
   "gpt-4o-mini": { input: 0.15, output: 0.6, verified: true },
   "llama-3.1-8b-instant": { input: 0.05, output: 0.08, verified: false },
 };

@@ -37,7 +37,7 @@ En Vercel: importa el repo, añade las mismas variables de entorno y la integrac
 | `DELETE /api/data` | Borra todos los datos |
 | `GET` / `PUT /api/state` | Lee o cambia los ajustes: `listening` y `fake` |
 
-La clasificación usa el modelo de chat más barato (`gpt-4.1-nano`, con `gpt-4o-mini` de reserva;
+La clasificación usa un modelo de chat barato (`gpt-4o-mini`;
 con solo clave de Groq, `llama-3.1-8b-instant`). `CLASSIFY_MODEL` permite forzar otro. Antes de
 crear una categoría nueva se le pasan las existentes para que las reutilice.
 
