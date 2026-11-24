@@ -1,4 +1,4 @@
-// Comesueños — ojos en la pantalla + escucha por volumen + envío del audio a la web.
+// Comechismes — ojos en la pantalla + escucha por volumen + envío del audio a la web.
 #include <Arduino.h>
 #include <HTTPClient.h>
 #include <Preferences.h>

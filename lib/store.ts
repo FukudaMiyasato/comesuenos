@@ -8,7 +8,7 @@ export type Transcript = {
   note?: string; // por qué no hay texto (sin clave, sin voz reconocible…)
 };
 
-const KEY = "comesuenos:transcripts";
+const KEY = "comechismes:transcripts";
 const MAX = 200;
 
 const redisUrl = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
@@ -28,20 +28,20 @@ async function redis<T>(...command: (string | number)[]): Promise<T> {
 }
 
 // Sin Redis (desarrollo local) se guarda en memoria del proceso.
-const g = globalThis as unknown as { __comesuenos?: Transcript[]; __comesuenosOn?: boolean };
-const memory = (g.__comesuenos ??= []);
+const g = globalThis as unknown as { __comechismes?: Transcript[]; __comechismesOn?: boolean };
+const memory = (g.__comechismes ??= []);
 
-const LISTENING_KEY = "comesuenos:listening";
+const LISTENING_KEY = "comechismes:listening";
 
 /** Interruptor de la web: si está apagado no se transcribe nada. Encendido por defecto. */
 export async function getListening(): Promise<boolean> {
   if (persistent) return (await redis<string | null>("GET", LISTENING_KEY)) !== "0";
-  return g.__comesuenosOn ?? true;
+  return g.__comechismesOn ?? true;
 }
 
 export async function setListening(on: boolean): Promise<void> {
   if (persistent) await redis("SET", LISTENING_KEY, on ? "1" : "0");
-  else g.__comesuenosOn = on;
+  else g.__comechismesOn = on;
 }
 
 export async function addTranscript(t: Transcript): Promise<void> {
@@ -75,12 +75,12 @@ export async function clearTranscripts(): Promise<void> {
 
 // ---- Audios ----
 // Se guardan los WAV para poder escucharlos desde la web. En Redis caducan solos.
-const AUDIO_KEY = "comesuenos:audio:";
+const AUDIO_KEY = "comechismes:audio:";
 const AUDIO_TTL_S = 24 * 60 * 60;
 const AUDIO_MEMORY_MAX = 40;
 
-const ga = globalThis as unknown as { __comesuenosAudio?: Map<string, Buffer> };
-const audioMemory = (ga.__comesuenosAudio ??= new Map());
+const ga = globalThis as unknown as { __comechismesAudio?: Map<string, Buffer> };
+const audioMemory = (ga.__comechismesAudio ??= new Map());
 
 export async function saveAudio(id: string, wav: ArrayBuffer): Promise<void> {
   const buf = Buffer.from(wav);

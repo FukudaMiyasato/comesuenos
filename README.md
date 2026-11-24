@@ -1,4 +1,4 @@
-# Comesueños
+# Comechismes
 
 Un ESP32-S3 con ojos que escucha: cuando detecta volumen graba hasta que hay silencio
 (o hasta el tiempo máximo), envía el audio a esta web y la web lo transcribe en vivo.
@@ -34,7 +34,7 @@ python3 -m venv .venv && .venv/bin/pip install platformio
 .venv/bin/pio run -d firmware -t upload
 ```
 
-Primer arranque: el equipo crea la red WiFi **Comesuenos-Setup**. Conéctate desde el móvil,
+Primer arranque: el equipo crea la red WiFi **Comechismes-Setup**. Conéctate desde el móvil,
 elige tu WiFi y escribe la URL del servidor (`https://tu-app.vercel.app`). Después el mismo
 formulario sigue disponible en la IP del equipo. Mantener BOOT 3 s borra el WiFi.
 

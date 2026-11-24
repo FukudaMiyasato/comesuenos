@@ -26,4 +26,4 @@
 
 #define STATE_POLL_MS 5000           // cada cuánto se consulta el interruptor de la web
 
-#define PORTAL_SSID "Comesuenos-Setup"
+#define PORTAL_SSID "Comechismes-Setup"

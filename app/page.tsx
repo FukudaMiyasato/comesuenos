@@ -68,7 +68,7 @@ export default function Home() {
           <span className="eye" />
         </div>
         <div>
-          <h1>Comesueños</h1>
+          <h1>Comechismes</h1>
           <p className="sub">Lo que escucha el ESP32, transcrito en vivo</p>
         </div>
         <span className="spacer" />
@@ -100,7 +100,7 @@ export default function Home() {
           {items.map((t) => (
             <li key={t.id} className={t.error ? "error" : undefined}>
               {t.text ? <p className="text">{t.text}</p> : <p className="note">{t.note ?? "Sin texto"}</p>}
-              {t.audio && <audio controls preload="none" src={`/api/audio/${t.id}`} />}
+              {t.audio && <audio controls preload="metadata" src={`/api/audio/${t.id}`} />}
               <div className="meta">
                 {time.format(t.at)} · {t.seconds.toFixed(1)} s{t.error ? " · error al transcribir" : ""}
               </div>
