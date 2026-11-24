@@ -1,17 +1,31 @@
+// Por motivos legales NO se guarda ni el audio ni el texto transcrito.
+// Lo único que persiste es: categoría + sentimiento + fecha de cada vez que se habló de ella.
+
 export type Sentiment = "positivo" | "neutral" | "negativo";
 
-export type Transcript = {
-  id: string;
-  text: string;
-  at: number; // epoch ms
-  seconds: number; // duración del audio
-  sentiment?: Sentiment;
-  categories?: string[];
+/** Una mención: [categoría, sentimiento, fecha en ms]. */
+export type Mention = [category: string, sentiment: Sentiment, at: number];
+
+/** Un círculo: una categoría con un sentimiento concreto. */
+export type Bubble = { category: string; sentiment: Sentiment; count: number; times: number[] };
+
+export type Settings = { listening: boolean; fake: boolean };
+
+type Data = {
+  /** Clave "categoría|sentimiento" → cuántas veces y cuándo (últimas fechas). */
+  bubbles: Record<string, { n: number; times: number[] }>;
+  /** Menciones de las últimas 24 h, para el gráfico por horas. */
+  recent: Mention[];
 };
 
-const KEY = "comechismes:transcripts";
-const LISTENING_KEY = "comechismes:listening";
-const MAX = 500;
+const DATA_KEY = "comechismes:data";
+const SETTINGS_KEY = "comechismes:settings";
+// Claves de versiones anteriores que contenían textos: se borran al limpiar.
+const LEGACY_KEYS = ["comechismes:transcripts", "comechismes:listening", "comesuenos:transcripts", "comesuenos:listening"];
+
+const TIMES_PER_BUBBLE = 40;
+const RECENT_MAX = 2000;
+export const DAY_MS = 24 * 60 * 60 * 1000;
 
 const redisUrl = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
 const redisToken = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
@@ -30,49 +44,73 @@ async function redis<T>(...command: (string | number)[]): Promise<T> {
 }
 
 // Sin Redis (desarrollo local) se guarda en memoria del proceso.
-const g = globalThis as unknown as { __comechismes?: Transcript[]; __comechismesOn?: boolean };
-const memory = (g.__comechismes ??= []);
+const g = globalThis as unknown as { __comechismesData?: Data; __comechismesSettings?: Settings };
 
-/** Interruptor de la web: si está apagado no se transcribe nada. Encendido por defecto. */
-export async function getListening(): Promise<boolean> {
-  if (persistent) return (await redis<string | null>("GET", LISTENING_KEY)) !== "0";
-  return g.__comechismesOn ?? true;
-}
+const emptyData = (): Data => ({ bubbles: {}, recent: [] });
+const defaults: Settings = { listening: true, fake: false };
 
-export async function setListening(on: boolean): Promise<void> {
-  if (persistent) await redis("SET", LISTENING_KEY, on ? "1" : "0");
-  else g.__comechismesOn = on;
-}
+const parse = <T>(raw: string | null, fallback: T): T => (raw ? { ...fallback, ...(JSON.parse(raw) as T) } : fallback);
 
-export async function addTranscript(t: Transcript): Promise<void> {
+/** Datos y ajustes en una sola lectura (un único comando de Redis por consulta). */
+export async function readAll(): Promise<{ data: Data; settings: Settings }> {
   if (persistent) {
-    await redis("LPUSH", KEY, JSON.stringify(t));
-    await redis("LTRIM", KEY, 0, MAX - 1);
-  } else {
-    memory.unshift(t);
-    memory.length = Math.min(memory.length, MAX);
+    const [d, s] = await redis<(string | null)[]>("MGET", DATA_KEY, SETTINGS_KEY);
+    return { data: parse(d, emptyData()), settings: parse(s, defaults) };
   }
+  return { data: g.__comechismesData ?? emptyData(), settings: g.__comechismesSettings ?? defaults };
 }
 
-/** Más recientes primero. */
-export async function listTranscripts(limit = MAX): Promise<Transcript[]> {
-  if (persistent) {
-    const rows = await redis<string[]>("LRANGE", KEY, 0, limit - 1);
-    return rows.map((r) => JSON.parse(r) as Transcript);
+export async function getSettings(): Promise<Settings> {
+  if (persistent) return parse(await redis<string | null>("GET", SETTINGS_KEY), defaults);
+  return g.__comechismesSettings ?? defaults;
+}
+
+export async function updateSettings(patch: Partial<Settings>): Promise<Settings> {
+  const next = { ...(await getSettings()), ...patch };
+  if (persistent) await redis("SET", SETTINGS_KEY, JSON.stringify(next));
+  else g.__comechismesSettings = next;
+  return next;
+}
+
+async function writeData(data: Data): Promise<void> {
+  if (persistent) await redis("SET", DATA_KEY, JSON.stringify(data));
+  else g.__comechismesData = data;
+}
+
+export const bubbleKey = (category: string, sentiment: Sentiment) => `${category}|${sentiment}`;
+
+/** Suma un punto a cada categoría (con ese sentimiento) y anota la fecha. */
+export async function addMentions(data: Data, categories: string[], sentiment: Sentiment, at: number): Promise<void> {
+  for (const category of categories) {
+    const key = bubbleKey(category, sentiment);
+    const b = (data.bubbles[key] ??= { n: 0, times: [] });
+    b.n++;
+    b.times = [at, ...b.times].slice(0, TIMES_PER_BUBBLE);
+    data.recent.unshift([category, sentiment, at]);
   }
-  return memory.slice(0, limit);
+  data.recent = data.recent.filter((m) => m[2] > at - DAY_MS).slice(0, RECENT_MAX);
+  await writeData(data);
 }
 
 /** Categorías que ya existen, de la más usada a la menos usada. */
-export async function listCategories(limit = 60): Promise<string[]> {
+export function listCategories(data: Data, limit = 60): string[] {
   const counts = new Map<string, number>();
-  for (const t of await listTranscripts()) {
-    for (const c of t.categories ?? []) counts.set(c, (counts.get(c) ?? 0) + 1);
+  for (const [key, b] of Object.entries(data.bubbles)) {
+    const category = key.slice(0, key.lastIndexOf("|"));
+    counts.set(category, (counts.get(category) ?? 0) + b.n);
   }
   return [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, limit).map(([name]) => name);
 }
 
-export async function clearTranscripts(): Promise<void> {
-  if (persistent) await redis("DEL", KEY);
-  else memory.length = 0;
+export function toBubbles(data: Data): Bubble[] {
+  return Object.entries(data.bubbles).map(([key, b]) => {
+    const cut = key.lastIndexOf("|");
+    return { category: key.slice(0, cut), sentiment: key.slice(cut + 1) as Sentiment, count: b.n, times: b.times };
+  });
+}
+
+/** Borra todos los datos, incluidas las claves antiguas que guardaban textos. */
+export async function clearAll(): Promise<void> {
+  if (persistent) await redis("DEL", DATA_KEY, ...LEGACY_KEYS);
+  else g.__comechismesData = emptyData();
 }

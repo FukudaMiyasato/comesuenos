@@ -24,6 +24,17 @@ function provider(): Provider | null {
   return null;
 }
 
+/** Qué servicio y modelos clasifican con la configuración actual (para la documentación). */
+export function classificationInfo(): { provider: string; model: string; fallbacks: string[] } | null {
+  const p = provider();
+  if (!p) return null;
+  return {
+    provider: p.url.includes("groq.com") ? "Groq" : "OpenAI",
+    model: p.models[0],
+    fallbacks: p.models.slice(1),
+  };
+}
+
 const SYSTEM = `Clasificas frases cortas en español transcritas de voz. Responde solo JSON:
 {"sentimiento":"positivo"|"neutral"|"negativo","categorias":["..."]}
 Reglas:

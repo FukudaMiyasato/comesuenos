@@ -1,18 +1,23 @@
 # Comechismes
 
 Un ESP32-S3 con ojos que escucha: cuando detecta volumen graba hasta que hay silencio
-(o hasta el tiempo máximo) y envía el audio a esta web. La web lo transcribe, le pone
-sentimiento y categorías, y lo dibuja como un gráfico de círculos.
+(o hasta el tiempo máximo) y envía el audio a esta web. La web lo transcribe, decide el
+sentimiento y las categorías, y guarda **solo eso** para dibujarlo.
 
 ```
-ESP32 (mic I2S) --WAV--> /api/audio --Whisper--> texto --GPT--> sentimiento + categorías --> círculos
+ESP32 (mic I2S) --WAV--> /api/audio --Whisper--> texto --GPT--> sentimiento + categorías
+                                                   └─ se descarta      └─ se guarda con la fecha
 ```
 
-- Un círculo por categoría; cuantos más textos, más grande.
-- Azul = positivo, rojo = negativo, gris = neutral (según la media de sus textos).
-- Al pulsar un círculo se centra, crece y muestra sus textos.
-- Cuando llega un texto nuevo, sus círculos brillan y palpitan.
-- El interruptor de los gatos pausa la escucha: en pausa no se transcribe ni se clasifica nada.
+**Privacidad:** no se guarda ni el audio ni la transcripción. Por cada frase solo queda
+categoría + sentimiento + fecha.
+
+- `/` — ojos, interruptor de gráfico y el gráfico:
+  - **Círculos:** uno por categoría y sentimiento (azul positivo, rojo negativo, gris claro neutral);
+    más grande cuantas más veces se habló. Al pulsarlo muestra cuándo fue creciendo.
+  - **24 horas:** línea de tiempo vertical con los temas de cada hora y los más hablados.
+- `/admin` — dormir/despertar la escucha y activar 50 datos falsos de demostración.
+- `/doc` — documentación: flujo de la IA, propuesta de evals y futuro con modelos locales.
 
 ## Web (Next.js, raíz del repo)
 
@@ -27,10 +32,10 @@ En Vercel: importa el repo, añade las mismas variables de entorno y la integrac
 
 | Ruta | Qué hace |
 | --- | --- |
-| `POST /api/audio` | Recibe un WAV (cuerpo crudo), lo transcribe, lo clasifica y lo guarda |
-| `GET /api/transcripts` | Textos con su sentimiento y categorías (la página consulta cada 3 s) |
-| `DELETE /api/transcripts` | Borra todo |
-| `GET` / `PUT /api/state` | Lee o cambia el interruptor de escucha |
+| `POST /api/audio` | Recibe un WAV, lo transcribe, lo clasifica y suma un punto a cada categoría |
+| `GET /api/data` | Círculos y menciones de las últimas 24 h (la página consulta cada 3 s) |
+| `DELETE /api/data` | Borra todos los datos |
+| `GET` / `PUT /api/state` | Lee o cambia los ajustes: `listening` y `fake` |
 
 La clasificación usa el modelo de chat más barato (`gpt-4.1-nano`, con `gpt-4o-mini` de reserva;
 con solo clave de Groq, `llama-3.1-8b-instant`). `CLASSIFY_MODEL` permite forzar otro. Antes de

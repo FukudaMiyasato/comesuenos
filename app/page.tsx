@@ -1,65 +1,32 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import Bubbles, { type Category, type Tone } from "./Bubbles";
-import CatSwitch from "./CatSwitch";
-
-export type Sentiment = "positivo" | "neutral" | "negativo";
-export type Transcript = {
-  id: string;
-  text: string;
-  at: number;
-  seconds: number;
-  sentiment?: Sentiment;
-  categories?: string[];
-};
-
-const UNCLASSIFIED = "sin clasificar";
-const SCORE: Record<Sentiment, number> = { positivo: 1, neutral: 0, negativo: -1 };
-
-/** Agrupa los textos por categoría; el color sale del sentimiento medio de sus textos. */
-function groupByCategory(items: Transcript[]): Category[] {
-  const map = new Map<string, Transcript[]>();
-  for (const t of items) {
-    if (!t.text) continue;
-    for (const name of t.categories?.length ? t.categories : [UNCLASSIFIED]) {
-      const list = map.get(name) ?? [];
-      list.push(t);
-      map.set(name, list);
-    }
-  }
-  return [...map.entries()].map(([name, list]) => {
-    const mean = list.reduce((s, t) => s + SCORE[t.sentiment ?? "neutral"], 0) / list.length;
-    const tone: Tone = mean > 0.2 ? "pos" : mean < -0.2 ? "neg" : "neu";
-    return { name, tone, items: list };
-  });
-}
+import { useCallback, useEffect, useRef, useState } from "react";
+import Bubbles from "./Bubbles";
+import Timeline from "./Timeline";
+import ViewSwitch, { type View } from "./ViewSwitch";
+import { keyOf, type Data } from "./types";
 
 export default function Home() {
-  const [items, setItems] = useState<Transcript[]>([]);
-  const [listening, setListening] = useState(true);
+  const [data, setData] = useState<Data | null>(null);
+  const [view, setView] = useState<View>("circles");
   const [pulsing, setPulsing] = useState<string[]>([]);
-  const [fresh, setFresh] = useState(false);
-  const seen = useRef<Set<string> | null>(null);
+  const prev = useRef<{ counts: Map<string, number>; fake: boolean } | null>(null);
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch("/api/transcripts", { cache: "no-store" });
+      const res = await fetch("/api/data", { cache: "no-store" });
       if (!res.ok) return;
-      const data = (await res.json()) as { transcripts: Transcript[]; listening: boolean };
-      setItems(data.transcripts);
-      setListening(data.listening);
+      const next = (await res.json()) as Data;
+      setData(next);
 
-      // Textos que no estaban en la consulta anterior: sus círculos palpitan.
-      const ids = new Set(data.transcripts.map((t) => t.id));
-      const before = seen.current;
-      seen.current = ids;
-      if (!before) return; // primera carga: nada es "nuevo"
-      const arrived = data.transcripts.filter((t) => t.text && !before.has(t.id));
-      if (arrived.length) {
-        setPulsing([...new Set(arrived.flatMap((t) => (t.categories?.length ? t.categories : [UNCLASSIFIED])))]);
-        setFresh(true);
-      }
+      // Círculos cuya cuenta subió desde la consulta anterior: palpitan.
+      const counts = new Map(next.bubbles.map((b) => [keyOf(b), b.count]));
+      const before = prev.current;
+      prev.current = { counts, fake: next.fake };
+      // En la primera carga, o al encender/apagar los datos falsos, nada es "nuevo".
+      if (!before || before.fake !== next.fake) return;
+      const grown = [...counts].filter(([k, n]) => n > (before.counts.get(k) ?? 0)).map(([k]) => k);
+      if (grown.length) setPulsing(grown);
     } catch {
       // sin conexión: se reintenta en la siguiente vuelta
     }
@@ -81,36 +48,27 @@ export default function Home() {
 
   useEffect(() => {
     if (!pulsing.length) return;
-    const id = setTimeout(() => {
-      setPulsing([]);
-      setFresh(false);
-    }, 4500);
+    const id = setTimeout(() => setPulsing([]), 4500);
     return () => clearTimeout(id);
   }, [pulsing]);
 
-  const toggle = async () => {
-    const next = !listening;
-    setListening(next); // respuesta inmediata; el sondeo confirma el valor real
-    await fetch("/api/state", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ listening: next }),
-    }).catch(() => {});
-    load();
-  };
-
-  const categories = useMemo(() => groupByCategory(items), [items]);
+  const fresh = pulsing.length > 0;
+  const asleep = data ? !data.listening : false;
 
   return (
-    <main>
+    <main className="home">
       <header>
-        <div className={`face${fresh ? " fresh" : ""}${listening ? "" : " asleep"}`} aria-hidden>
+        <div className={`face${fresh ? " fresh" : ""}${asleep ? " asleep" : ""}`} aria-hidden>
           <span className="eye" />
           <span className="eye" />
         </div>
-        <CatSwitch awake={listening} onToggle={toggle} />
+        <ViewSwitch view={view} onChange={setView} />
       </header>
-      <Bubbles categories={categories} pulsing={pulsing} />
+      {view === "circles" ? (
+        <Bubbles bubbles={data?.bubbles ?? []} pulsing={pulsing} />
+      ) : (
+        <Timeline mentions={data?.recent ?? []} />
+      )}
     </main>
   );
 }

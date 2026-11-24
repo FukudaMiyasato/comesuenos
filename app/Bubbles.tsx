@@ -1,22 +1,23 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { Transcript } from "./page";
-
-export type Tone = "pos" | "neg" | "neu";
-export type Category = { name: string; tone: Tone; items: Transcript[] };
+import { keyOf, TONE, type Bubble } from "./types";
 
 type Node = { x: number; y: number; vx: number; vy: number; r: number; target: number };
 
 const GAP = 8;
 const time = new Intl.DateTimeFormat("es", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 
+const WORD = { positivo: "positivo", neutral: "neutral", negativo: "negativo" } as const;
+
 /**
- * Círculos por categoría: cuantos más textos, más grande. Una pequeña simulación
- * los junta hacia el centro sin que se pisen. Al pulsar uno se centra, crece y
- * muestra sus textos.
+ * Un círculo por categoría y sentimiento (una misma categoría puede tener uno azul
+ * y otro rojo). Cuantas más veces se habló, más grande. Una pequeña simulación los
+ * junta hacia el centro sin que se pisen. Al pulsar uno se centra, crece y muestra
+ * cuándo fue creciendo. No hay textos: no se guardan.
  */
-export default function Bubbles({ categories, pulsing }: { categories: Category[]; pulsing: string[] }) {
+export default function Bubbles({ bubbles, pulsing }: { bubbles: Bubble[]; pulsing: string[] }) {
+  const categories = bubbles.map((b) => ({ ...b, name: keyOf(b) }));
   const box = useRef<HTMLDivElement>(null);
   const els = useRef(new Map<string, HTMLDivElement>());
   const nodes = useRef(new Map<string, Node>());
@@ -51,7 +52,7 @@ export default function Bubbles({ categories, pulsing }: { categories: Category[
       const map = nodes.current;
 
       // Radio = k·√(nº de textos): el área es proporcional a la cantidad.
-      const total = categories.reduce((s, c) => s + c.items.length, 0);
+      const total = categories.reduce((s, c) => s + c.count, 0);
       const k = Math.min(Math.sqrt((W * H * 0.3) / (Math.PI * Math.max(total, 1))), Math.min(W, H) * 0.2);
       const big = Math.max(120, Math.min(W, H) * 0.47);
 
@@ -65,7 +66,7 @@ export default function Bubbles({ categories, pulsing }: { categories: Category[
           n = { x: cx + Math.cos(a) * d, y: cy + Math.sin(a) * d, vx: 0, vy: 0, r: 0, target: 0 };
           map.set(c.name, n);
         }
-        n.target = c.name === selected ? big : Math.max(30, k * Math.sqrt(c.items.length));
+        n.target = c.name === selected ? big : Math.max(30, k * Math.sqrt(c.count));
       }
 
       const list = [...map.entries()];
@@ -132,18 +133,20 @@ export default function Bubbles({ categories, pulsing }: { categories: Category[
               if (el) els.current.set(c.name, el);
               else els.current.delete(c.name);
             }}
-            className={`bubble ${c.tone}${open ? " open" : ""}${pulsing.includes(c.name) ? " pulse" : ""}`}
+            className={`bubble ${TONE[c.sentiment]}${open ? " open" : ""}${pulsing.includes(c.name) ? " pulse" : ""}`}
           >
             {open ? (
               <div className="skin detail" onClick={(e) => e.stopPropagation()}>
-                <button type="button" className="title" onClick={() => setSelected(null)} aria-label={`Cerrar ${c.name}`}>
-                  {c.name} <span>{c.items.length}</span>
+                <button type="button" className="title" onClick={() => setSelected(null)} aria-label={`Cerrar ${c.category}`}>
+                  {c.category}
                 </button>
+                <p className="summary">
+                  {c.count} {c.count === 1 ? "vez" : "veces"} · {WORD[c.sentiment]}
+                </p>
                 <ul>
-                  {c.items.map((t) => (
-                    <li key={t.id} className={t.sentiment ?? "neutral"}>
-                      <p>{t.text}</p>
-                      <time>{time.format(t.at)}</time>
+                  {c.times.map((t, i) => (
+                    <li key={`${t}-${i}`}>
+                      <time>{time.format(t)}</time>
                     </li>
                   ))}
                 </ul>
@@ -156,10 +159,10 @@ export default function Bubbles({ categories, pulsing }: { categories: Category[
                   e.stopPropagation();
                   setSelected(c.name);
                 }}
-                aria-label={`${c.name}: ${c.items.length} textos`}
+                aria-label={`${c.category}, ${WORD[c.sentiment]}: ${c.count} ${c.count === 1 ? "vez" : "veces"}`}
               >
-                <span className="name">{c.name}</span>
-                <span className="count">{c.items.length}</span>
+                <span className="name">{c.category}</span>
+                <span className="count">{c.count}</span>
               </button>
             )}
           </div>

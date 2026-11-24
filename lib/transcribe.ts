@@ -20,6 +20,12 @@ function provider(): Provider | null {
   return null;
 }
 
+/** Qué servicio y modelo transcribe con la configuración actual (para la documentación). */
+export function transcriptionInfo(): { provider: string; model: string } | null {
+  const p = provider();
+  return p && { provider: p.name === "groq" ? "Groq" : "OpenAI", model: p.model };
+}
+
 export class NoProviderError extends Error {}
 
 export async function transcribe(wav: ArrayBuffer): Promise<string> {

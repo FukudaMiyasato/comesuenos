@@ -1,5 +1,5 @@
 import { classify } from "@/lib/classify";
-import { addTranscript, getListening, listCategories } from "@/lib/store";
+import { addMentions, listCategories, readAll } from "@/lib/store";
 import { NoProviderError, transcribe } from "@/lib/transcribe";
 
 export const runtime = "nodejs";
@@ -29,10 +29,11 @@ export async function POST(req: Request) {
     return Response.json({ error: "token inválido" }, { status: 401 });
   }
 
-  // Interruptor apagado: se descarta el audio sin llamar al servicio de transcripción.
-  if (!(await getListening())) {
+  // Interruptor apagado: se descarta el audio sin llamar a ningún modelo.
+  const { data, settings } = await readAll();
+  if (!settings.listening) {
     await req.body?.cancel().catch(() => {});
-    return Response.json({ ok: true, listening: false, text: "" });
+    return Response.json({ ok: true, listening: false });
   }
 
   const wav = await req.arrayBuffer();
@@ -40,8 +41,8 @@ export async function POST(req: Request) {
   if (wav.byteLength > MAX_BYTES) return Response.json({ error: "audio demasiado grande" }, { status: 413 });
 
   const seconds = Math.round(wavSeconds(wav) * 10) / 10;
-  const base = { id: crypto.randomUUID(), at: Date.now(), seconds };
 
+  // El texto solo existe en memoria durante esta petición: nunca se guarda ni se devuelve.
   let text: string;
   try {
     text = await transcribe(wav);
@@ -53,13 +54,16 @@ export async function POST(req: Request) {
       { status: err instanceof NoProviderError ? 503 : 502 },
     );
   }
-  if (!text) return Response.json({ ok: true, listening: true, text: "", seconds });
+  if (!text) return Response.json({ ok: true, listening: true, seconds });
 
   // Sentimiento + categorías: primero se intenta encajar en las que ya existen.
-  const tags = await classify(text, await listCategories()).catch((err) => {
+  const tags = await classify(text, listCategories(data)).catch((err) => {
     console.error("clasificación falló:", err);
     return null;
   });
-  await addTranscript({ ...base, text, ...(tags ?? {}) });
-  return Response.json({ ok: true, listening: true, text, ...(tags ?? {}), seconds });
+  // Sin clasificación no hay nada que guardar: la frase se descarta.
+  if (!tags) return Response.json({ ok: true, listening: true, classified: false, seconds });
+
+  await addMentions(data, tags.categories, tags.sentiment, Date.now());
+  return Response.json({ ok: true, listening: true, ...tags, seconds });
 }
