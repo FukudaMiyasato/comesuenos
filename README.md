@@ -45,6 +45,24 @@ Las categorías están orientadas a un local de comida rápida: se parte de `lim
 `local`, `comida`, `variedad` y `bulla` (ver `BASE_CATEGORIES` en `lib/classify.ts`), y el modelo
 puede añadir otras si ninguna encaja.
 
+## Todo en la Mac (modelos locales, sin ESP32)
+
+La Mac escucha con su propio micrófono y los dos modelos corren en ella: no se llama a OpenAI ni a ningún otro servicio, y el audio no sale de la máquina.
+
+```bash
+brew install ollama whisper-cpp ffmpeg
+mkdir -p local/models
+curl -L -o local/models/ggml-large-v3-turbo.bin https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo.bin
+npm run local
+```
+
+`npm run local` arranca Ollama, el servidor de Whisper (puerto 8178), la web con `LOCAL_AI=1` (puerto 3000) y la escucha por micrófono (`local/listen.mjs`). Ctrl+C lo detiene todo.
+
+- La primera vez macOS pide permiso de micrófono para la terminal.
+- `npm run local -- --levels` muestra el nivel de sonido y el umbral, para ajustar la sensibilidad (`MIC_MIN_THRESHOLD`, por defecto 250).
+- `MIC="nombre o índice"` elige otro micrófono; `CLASSIFY_MODEL=qwen2.5:7b` usa un modelo de clasificación más grande.
+- Sin las variables de Upstash en `.env.local`, los datos viven en memoria y se pierden al detener la web.
+
 ## Firmware (`firmware/`, PlatformIO + Arduino)
 
 Placa: ESP32-S3 N16R8 tipo "bread-compact" — OLED SSD1306 (SDA 41, SCL 42),

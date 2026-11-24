@@ -1,14 +1,24 @@
 import type { Sentiment } from "./store";
+import { localAI } from "./transcribe";
 
 export type Classification = { sentiment: Sentiment; categories: string[]; model: string };
 
-type Provider = { url: string; key: string; models: string[] };
+type Provider = { name: string; url: string; key: string; models: string[] };
 
 // Se usa el modelo de chat más barato disponible. CLASSIFY_MODEL permite forzar otro.
 function provider(): Provider | null {
   const forced = process.env.CLASSIFY_MODEL ? [process.env.CLASSIFY_MODEL] : [];
+  if (localAI()) {
+    return {
+      name: "Local (Ollama)",
+      url: process.env.LOCAL_LLM_URL || "http://127.0.0.1:11434/v1/chat/completions",
+      key: "",
+      models: [...forced, "qwen2.5:3b"],
+    };
+  }
   if (process.env.OPENAI_API_KEY) {
     return {
+      name: "OpenAI",
       url: "https://api.openai.com/v1/chat/completions",
       key: process.env.OPENAI_API_KEY,
       // gpt-4.1-nano ya no está disponible en esta cuenta: se comprobó que siempre respondía el de reserva.
@@ -17,6 +27,7 @@ function provider(): Provider | null {
   }
   if (process.env.GROQ_API_KEY) {
     return {
+      name: "Groq",
       url: "https://api.groq.com/openai/v1/chat/completions",
       key: process.env.GROQ_API_KEY,
       models: [...forced, "llama-3.1-8b-instant"],
@@ -30,7 +41,7 @@ export function classificationInfo(): { provider: string; model: string; fallbac
   const p = provider();
   if (!p) return null;
   return {
-    provider: p.url.includes("groq.com") ? "Groq" : "OpenAI",
+    provider: p.name,
     model: p.models[0],
     fallbacks: p.models.slice(1),
   };
@@ -65,7 +76,7 @@ export async function classify(text: string, existing: string[]): Promise<Classi
   for (const model of p.models) {
     const res = await fetch(p.url, {
       method: "POST",
-      headers: { Authorization: `Bearer ${p.key}`, "Content-Type": "application/json" },
+      headers: { ...(p.key && { Authorization: `Bearer ${p.key}` }), "Content-Type": "application/json" },
       body: JSON.stringify({
         model,
         temperature: 0,

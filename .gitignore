@@ -10,3 +10,4 @@ firmware/include/secrets.h
 *.tsbuildinfo
 next-env.d.ts
 .DS_Store
+local/models/

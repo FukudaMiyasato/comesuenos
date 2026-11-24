@@ -2,6 +2,8 @@
 // "verified" = comprobado en la página oficial de precios en la fecha indicada;
 // si es false, es un precio de referencia sin confirmar y conviene revisarlo.
 
+import { localAI } from "./transcribe";
+
 export const PRICES_CHECKED = "24 nov 2026";
 
 /** Transcripción: USD por minuto de audio. */
@@ -23,12 +25,17 @@ export const ASSUMED = {
   outputTokens: 25, // el JSON de respuesta
 };
 
+// En modo local los modelos corren en esta máquina: no hay coste por frase.
+const FREE = { usd: 0, verified: true };
+
 export function sttCost(model: string) {
+  if (localAI()) return FREE;
   const p = STT_PRICES[model];
   return p ? { usd: (ASSUMED.seconds / 60) * p.perMinute, verified: p.verified } : null;
 }
 
 export function llmCost(model: string) {
+  if (localAI()) return FREE;
   const p = LLM_PRICES[model];
   return p
     ? { usd: (ASSUMED.inputTokens * p.input + ASSUMED.outputTokens * p.output) / 1e6, verified: p.verified }

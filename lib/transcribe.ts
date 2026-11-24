@@ -1,6 +1,17 @@
 type Provider = { name: string; url: string; key: string; model: string };
 
+/** LOCAL_AI=1: los modelos corren en esta máquina (whisper.cpp + Ollama) y no se llama a ningún servicio externo. */
+export const localAI = () => process.env.LOCAL_AI === "1";
+
 function provider(): Provider | null {
+  if (localAI()) {
+    return {
+      name: "local",
+      url: process.env.LOCAL_STT_URL || "http://127.0.0.1:8178/v1/audio/transcriptions",
+      key: "",
+      model: process.env.STT_MODEL || "whisper-large-v3-turbo",
+    };
+  }
   if (process.env.GROQ_API_KEY) {
     return {
       name: "groq",
@@ -23,7 +34,8 @@ function provider(): Provider | null {
 /** Qué servicio y modelo transcribe con la configuración actual (para la documentación). */
 export function transcriptionInfo(): { provider: string; model: string } | null {
   const p = provider();
-  return p && { provider: p.name === "groq" ? "Groq" : "OpenAI", model: p.model };
+  const names: Record<string, string> = { local: "Local (whisper.cpp)", groq: "Groq", openai: "OpenAI" };
+  return p && { provider: names[p.name], model: p.model };
 }
 
 export class NoProviderError extends Error {}
@@ -42,7 +54,7 @@ export async function transcribe(wav: ArrayBuffer): Promise<string> {
 
   const res = await fetch(p.url, {
     method: "POST",
-    headers: { Authorization: `Bearer ${p.key}` },
+    headers: p.key ? { Authorization: `Bearer ${p.key}` } : {},
     body: form,
   });
   if (!res.ok) throw new Error(`${p.name} ${res.status}: ${(await res.text()).slice(0, 300)}`);
