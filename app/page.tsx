@@ -1,39 +1,68 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Bubbles, { type Category, type Tone } from "./Bubbles";
+import CatSwitch from "./CatSwitch";
 
-type Transcript = {
+export type Sentiment = "positivo" | "neutral" | "negativo";
+export type Transcript = {
   id: string;
   text: string;
   at: number;
   seconds: number;
-  error?: boolean;
-  audio?: boolean;
-  note?: string;
+  sentiment?: Sentiment;
+  categories?: string[];
 };
 
-const time = new Intl.DateTimeFormat("es", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+const UNCLASSIFIED = "sin clasificar";
+const SCORE: Record<Sentiment, number> = { positivo: 1, neutral: 0, negativo: -1 };
+
+/** Agrupa los textos por categoría; el color sale del sentimiento medio de sus textos. */
+function groupByCategory(items: Transcript[]): Category[] {
+  const map = new Map<string, Transcript[]>();
+  for (const t of items) {
+    if (!t.text) continue;
+    for (const name of t.categories?.length ? t.categories : [UNCLASSIFIED]) {
+      const list = map.get(name) ?? [];
+      list.push(t);
+      map.set(name, list);
+    }
+  }
+  return [...map.entries()].map(([name, list]) => {
+    const mean = list.reduce((s, t) => s + SCORE[t.sentiment ?? "neutral"], 0) / list.length;
+    const tone: Tone = mean > 0.2 ? "pos" : mean < -0.2 ? "neg" : "neu";
+    return { name, tone, items: list };
+  });
+}
 
 export default function Home() {
-  const [items, setItems] = useState<Transcript[] | null>(null);
-  const [persistent, setPersistent] = useState(true);
-  const [offline, setOffline] = useState(false);
+  const [items, setItems] = useState<Transcript[]>([]);
   const [listening, setListening] = useState(true);
-  const [now, setNow] = useState(() => Date.now());
+  const [pulsing, setPulsing] = useState<string[]>([]);
+  const [fresh, setFresh] = useState(false);
+  const seen = useRef<Set<string> | null>(null);
 
   const load = useCallback(async () => {
     try {
       const res = await fetch("/api/transcripts", { cache: "no-store" });
-      if (!res.ok) throw new Error(String(res.status));
-      const data = (await res.json()) as { transcripts: Transcript[]; persistent: boolean; listening: boolean };
+      if (!res.ok) return;
+      const data = (await res.json()) as { transcripts: Transcript[]; listening: boolean };
       setItems(data.transcripts);
-      setPersistent(data.persistent);
       setListening(data.listening);
-      setOffline(false);
+
+      // Textos que no estaban en la consulta anterior: sus círculos palpitan.
+      const ids = new Set(data.transcripts.map((t) => t.id));
+      const before = seen.current;
+      seen.current = ids;
+      if (!before) return; // primera carga: nada es "nuevo"
+      const arrived = data.transcripts.filter((t) => t.text && !before.has(t.id));
+      if (arrived.length) {
+        setPulsing([...new Set(arrived.flatMap((t) => (t.categories?.length ? t.categories : [UNCLASSIFIED])))]);
+        setFresh(true);
+      }
     } catch {
-      setOffline(true);
+      // sin conexión: se reintenta en la siguiente vuelta
     }
-    setNow(Date.now());
   }, []);
 
   // Solo se consulta con la pestaña visible, para no gastar invocaciones en segundo plano.
@@ -50,10 +79,14 @@ export default function Home() {
     };
   }, [load]);
 
-  const clear = async () => {
-    await fetch("/api/transcripts", { method: "DELETE" });
-    load();
-  };
+  useEffect(() => {
+    if (!pulsing.length) return;
+    const id = setTimeout(() => {
+      setPulsing([]);
+      setFresh(false);
+    }, 4500);
+    return () => clearTimeout(id);
+  }, [pulsing]);
 
   const toggle = async () => {
     const next = !listening;
@@ -66,7 +99,7 @@ export default function Home() {
     load();
   };
 
-  const fresh = items?.[0] ? now - items[0].at < 10000 : false;
+  const categories = useMemo(() => groupByCategory(items), [items]);
 
   return (
     <main>
@@ -75,47 +108,9 @@ export default function Home() {
           <span className="eye" />
           <span className="eye" />
         </div>
-        <div>
-          <h1>Comechismes</h1>
-          <p className="sub">Lo que escucha el ESP32, transcrito en vivo</p>
-        </div>
-        <span className="spacer" />
-        <label className="switch">
-          <input type="checkbox" role="switch" checked={listening} onChange={toggle} />
-          <span className="track" aria-hidden />
-          <span>{listening ? "Escuchando" : "En pausa"}</span>
-        </label>
-        {items && items.length > 0 && <button onClick={clear}>Limpiar</button>}
+        <CatSwitch awake={listening} onToggle={toggle} />
       </header>
-
-      {offline && <div className="notice">Sin conexión con el servidor. Reintentando…</div>}
-      {!persistent && (
-        <div className="notice">
-          Guardando en memoria (modo local). En Vercel añade Upstash Redis para que las transcripciones persistan.
-        </div>
-      )}
-
-      {!listening && (
-        <div className="notice">
-          En pausa: nada se transcribe. El dispositivo se duerme en cuanto intenta enviar su próximo audio.
-        </div>
-      )}
-
-      {items === null ? null : items.length === 0 ? (
-        <p className="empty">{listening ? "Esperando a que el dispositivo escuche algo…" : "Escucha en pausa."}</p>
-      ) : (
-        <ol>
-          {items.map((t) => (
-            <li key={t.id} className={t.error ? "error" : undefined}>
-              {t.text ? <p className="text">{t.text}</p> : <p className="note">{t.note ?? "Sin texto"}</p>}
-              {t.audio && <audio controls preload="metadata" src={`/api/audio/${t.id}`} />}
-              <div className="meta">
-                {time.format(t.at)} · {t.seconds.toFixed(1)} s{t.error ? " · error al transcribir" : ""}
-              </div>
-            </li>
-          ))}
-        </ol>
-      )}
+      <Bubbles categories={categories} pulsing={pulsing} />
     </main>
   );
 }

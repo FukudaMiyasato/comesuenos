@@ -1,15 +1,17 @@
+export type Sentiment = "positivo" | "neutral" | "negativo";
+
 export type Transcript = {
   id: string;
   text: string;
   at: number; // epoch ms
   seconds: number; // duración del audio
-  error?: boolean;
-  audio?: boolean; // hay un WAV guardado en /api/audio/<id>
-  note?: string; // por qué no hay texto (sin clave, sin voz reconocible…)
+  sentiment?: Sentiment;
+  categories?: string[];
 };
 
 const KEY = "comechismes:transcripts";
-const MAX = 200;
+const LISTENING_KEY = "comechismes:listening";
+const MAX = 500;
 
 const redisUrl = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
 const redisToken = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
@@ -30,8 +32,6 @@ async function redis<T>(...command: (string | number)[]): Promise<T> {
 // Sin Redis (desarrollo local) se guarda en memoria del proceso.
 const g = globalThis as unknown as { __comechismes?: Transcript[]; __comechismesOn?: boolean };
 const memory = (g.__comechismes ??= []);
-
-const LISTENING_KEY = "comechismes:listening";
 
 /** Interruptor de la web: si está apagado no se transcribe nada. Encendido por defecto. */
 export async function getListening(): Promise<boolean> {
@@ -55,7 +55,7 @@ export async function addTranscript(t: Transcript): Promise<void> {
 }
 
 /** Más recientes primero. */
-export async function listTranscripts(limit = 50): Promise<Transcript[]> {
+export async function listTranscripts(limit = MAX): Promise<Transcript[]> {
   if (persistent) {
     const rows = await redis<string[]>("LRANGE", KEY, 0, limit - 1);
     return rows.map((r) => JSON.parse(r) as Transcript);
@@ -63,39 +63,16 @@ export async function listTranscripts(limit = 50): Promise<Transcript[]> {
   return memory.slice(0, limit);
 }
 
+/** Categorías que ya existen, de la más usada a la menos usada. */
+export async function listCategories(limit = 60): Promise<string[]> {
+  const counts = new Map<string, number>();
+  for (const t of await listTranscripts()) {
+    for (const c of t.categories ?? []) counts.set(c, (counts.get(c) ?? 0) + 1);
+  }
+  return [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, limit).map(([name]) => name);
+}
+
 export async function clearTranscripts(): Promise<void> {
-  if (persistent) {
-    const ids = (await listTranscripts(MAX)).filter((t) => t.audio).map((t) => AUDIO_KEY + t.id);
-    await redis("DEL", KEY, ...ids);
-  } else {
-    memory.length = 0;
-    audioMemory.clear();
-  }
-}
-
-// ---- Audios ----
-// Se guardan los WAV para poder escucharlos desde la web. En Redis caducan solos.
-const AUDIO_KEY = "comechismes:audio:";
-const AUDIO_TTL_S = 24 * 60 * 60;
-const AUDIO_MEMORY_MAX = 40;
-
-const ga = globalThis as unknown as { __comechismesAudio?: Map<string, Buffer> };
-const audioMemory = (ga.__comechismesAudio ??= new Map());
-
-export async function saveAudio(id: string, wav: ArrayBuffer): Promise<void> {
-  const buf = Buffer.from(wav);
-  if (persistent) {
-    await redis("SET", AUDIO_KEY + id, buf.toString("base64"), "EX", AUDIO_TTL_S);
-  } else {
-    audioMemory.set(id, buf);
-    while (audioMemory.size > AUDIO_MEMORY_MAX) audioMemory.delete(audioMemory.keys().next().value!);
-  }
-}
-
-export async function getAudio(id: string): Promise<Buffer | null> {
-  if (persistent) {
-    const b64 = await redis<string | null>("GET", AUDIO_KEY + id);
-    return b64 ? Buffer.from(b64, "base64") : null;
-  }
-  return audioMemory.get(id) ?? null;
+  if (persistent) await redis("DEL", KEY);
+  else memory.length = 0;
 }

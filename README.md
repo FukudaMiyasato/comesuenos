@@ -1,11 +1,18 @@
 # Comechismes
 
 Un ESP32-S3 con ojos que escucha: cuando detecta volumen graba hasta que hay silencio
-(o hasta el tiempo máximo), envía el audio a esta web y la web lo transcribe en vivo.
+(o hasta el tiempo máximo) y envía el audio a esta web. La web lo transcribe, le pone
+sentimiento y categorías, y lo dibuja como un gráfico de círculos.
 
 ```
-ESP32 (mic I2S) --WAV por HTTP POST--> /api/audio --Whisper--> lista en /
+ESP32 (mic I2S) --WAV--> /api/audio --Whisper--> texto --GPT--> sentimiento + categorías --> círculos
 ```
+
+- Un círculo por categoría; cuantos más textos, más grande.
+- Azul = positivo, rojo = negativo, gris = neutral (según la media de sus textos).
+- Al pulsar un círculo se centra, crece y muestra sus textos.
+- Cuando llega un texto nuevo, sus círculos brillan y palpitan.
+- El interruptor de los gatos pausa la escucha: en pausa no se transcribe ni se clasifica nada.
 
 ## Web (Next.js, raíz del repo)
 
@@ -20,9 +27,14 @@ En Vercel: importa el repo, añade las mismas variables de entorno y la integrac
 
 | Ruta | Qué hace |
 | --- | --- |
-| `POST /api/audio` | Recibe un WAV (cuerpo crudo), lo transcribe y lo guarda |
-| `GET /api/transcripts` | Últimas transcripciones (la página la consulta cada 3 s) |
-| `DELETE /api/transcripts` | Borra la lista |
+| `POST /api/audio` | Recibe un WAV (cuerpo crudo), lo transcribe, lo clasifica y lo guarda |
+| `GET /api/transcripts` | Textos con su sentimiento y categorías (la página consulta cada 3 s) |
+| `DELETE /api/transcripts` | Borra todo |
+| `GET` / `PUT /api/state` | Lee o cambia el interruptor de escucha |
+
+La clasificación usa el modelo de chat más barato (`gpt-4.1-nano`, con `gpt-4o-mini` de reserva;
+con solo clave de Groq, `llama-3.1-8b-instant`). `CLASSIFY_MODEL` permite forzar otro. Antes de
+crear una categoría nueva se le pasan las existentes para que las reutilice.
 
 ## Firmware (`firmware/`, PlatformIO + Arduino)
 
