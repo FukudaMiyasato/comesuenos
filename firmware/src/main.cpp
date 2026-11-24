@@ -12,14 +12,50 @@
 
 static Preferences prefs;
 static WiFiManager wm;
-static WiFiManagerParameter *pUrl, *pToken;
+static WiFiManagerParameter *pUrl, *pToken, *pSsid2, *pPass2;
 static String serverUrl, deviceToken;
+// Red principal (la que guarda el portal) y red alternativa por si la principal no aparece.
+static String mainSsid, mainPass, altSsid, altPass;
 
 // ---------- Configuración ----------
 static void loadConfig() {
   prefs.begin("cfg", false);
   serverUrl = prefs.isKey("url") ? prefs.getString("url") : String();
   deviceToken = prefs.isKey("token") ? prefs.getString("token") : String();
+  altSsid = prefs.isKey("ssid2") ? prefs.getString("ssid2") : String();
+  altPass = prefs.isKey("pass2") ? prefs.getString("pass2") : String();
+}
+
+static void setAltWifi(String ssid, String pass) {
+  ssid.trim();
+  altSsid = ssid;
+  altPass = ssid.isEmpty() ? String() : pass;
+  prefs.putString("ssid2", altSsid);
+  prefs.putString("pass2", altPass);
+}
+
+/**
+ * Sin conexión: cada 20 s prueba una red, alternando principal y alternativa.
+ * Los intentos no se guardan en flash, así la red principal nunca se pisa.
+ */
+static void wifiFallback(bool connected) {
+  static uint32_t lastTry = 0;
+  static bool tryAlt = false;
+  if (connected) {
+    // La red a la que se llega sin ser la alternativa es la principal: se recuerda.
+    if (WiFi.SSID() != altSsid || altSsid.isEmpty()) { mainSsid = WiFi.SSID(); mainPass = WiFi.psk(); }
+    lastTry = millis();
+    tryAlt = true; // al perder la conexión, lo primero que se prueba es la otra red
+    return;
+  }
+  if (altSsid.isEmpty() || millis() - lastTry < 20000) return;
+  lastTry = millis();
+  const String &ssid = (tryAlt || mainSsid.isEmpty()) ? altSsid : mainSsid;
+  const String &pass = (tryAlt || mainSsid.isEmpty()) ? altPass : mainPass;
+  tryAlt = !tryAlt;
+  Serial.println("[wifi] sin conexion, probando " + ssid);
+  WiFi.persistent(false);
+  WiFi.begin(ssid.c_str(), pass.c_str());
 }
 
 static void setUrl(String u) {
@@ -255,14 +291,21 @@ static void handleSerial() {
       WiFi.begin(ssid.c_str(), pass.c_str());
       Serial.println("ok conectando a " + ssid);
     }
+    else if (line.startsWith("wifi2")) { // red alternativa: "wifi2 <ssid> <clave>", o "wifi2" sola para borrarla
+      String rest = line.substring(5);
+      rest.trim();
+      int sp = rest.indexOf(' ');
+      setAltWifi(sp < 0 ? rest : rest.substring(0, sp), sp < 0 ? "" : rest.substring(sp + 1));
+      Serial.println(altSsid.isEmpty() ? "ok sin red alternativa" : "ok red alternativa " + altSsid);
+    }
     else if (line == "levels") { debugLevels = !debugLevels; }
     else if (line == "info") {
-      Serial.printf("wifi=%s ip=%s url=%s escucha=%d ruido=%.0f psram=%u\n", WiFi.SSID().c_str(),
-                    WiFi.localIP().toString().c_str(), serverUrl.c_str(), (int)listeningEnabled, noiseFloor,
-                    ESP.getFreePsram());
+      Serial.printf("wifi=%s ip=%s alternativa=%s url=%s escucha=%d ruido=%.0f psram=%u\n", WiFi.SSID().c_str(),
+                    WiFi.localIP().toString().c_str(), altSsid.isEmpty() ? "(ninguna)" : altSsid.c_str(),
+                    serverUrl.c_str(), (int)listeningEnabled, noiseFloor, ESP.getFreePsram());
     }
     else if (line == "reset") { wm.resetSettings(); prefs.clear(); ESP.restart(); }
-    else if (line.length()) Serial.println("comandos: url <u> | token <t> | wifi <ssid> <clave> | levels | info | reset");
+    else if (line.length()) Serial.println("comandos: url <u> | token <t> | wifi <ssid> <clave> | wifi2 <ssid> <clave> | levels | info | reset");
     line = "";
   }
 }
@@ -274,6 +317,7 @@ static void checkBootButton() {
     if (millis() - downSince > 3000) { // 3 s: borra WiFi y reabre el portal
       faceMessage("Borrando WiFi...", "", "");
       wm.resetSettings();
+      setAltWifi("", "");
       delay(800);
       ESP.restart();
     }
@@ -298,12 +342,27 @@ void setup() {
   pUrl = new WiFiManagerParameter("url", "URL del servidor (https://tu-app.vercel.app)", serverUrl.c_str(), 120);
   pToken = new WiFiManagerParameter("token", "Token del dispositivo (opcional)", deviceToken.c_str(), 64);
   wm.addParameter(pUrl);
+  pSsid2 = new WiFiManagerParameter("ssid2", "Red WiFi alternativa (opcional)", altSsid.c_str(), 32);
+  pPass2 = new WiFiManagerParameter("pass2", "Clave de la red alternativa", altPass.c_str(), 64, "type='password'");
   wm.addParameter(pToken);
-  wm.setSaveParamsCallback([] { setUrl(pUrl->getValue()); setToken(pToken->getValue()); showStatus(); });
+  wm.addParameter(pSsid2);
+  wm.addParameter(pPass2);
+  wm.setSaveParamsCallback([] {
+    setUrl(pUrl->getValue());
+    setToken(pToken->getValue());
+    setAltWifi(pSsid2->getValue(), pPass2->getValue());
+    showStatus();
+  });
+  // "param" añade la página Setup: permite cambiar estos campos sin reconfigurar el WiFi.
+  static const char *menu[] = {"wifi", "param", "info", "sep", "restart"};
+  wm.setMenu(menu, 5);
+  wm.setConnectTimeout(15);
   wm.setConfigPortalBlocking(false);
   wm.setDebugOutput(false);
   WiFi.mode(WIFI_STA);
   WiFi.setSleep(false);
+  mainSsid = wm.getWiFiSSID(true);
+  mainPass = wm.getWiFiPass(true);
   faceMessage("Conectando WiFi...", "", "");
   if (wm.autoConnect(PORTAL_SSID)) wm.startWebPortal();
   showStatus();
@@ -320,6 +379,7 @@ void loop() {
   wm.process();
 
   bool connected = WiFi.status() == WL_CONNECTED;
+  wifiFallback(connected);
   if (connected != wasConnected) {
     wasConnected = connected;
     if (connected) {

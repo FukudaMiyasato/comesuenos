@@ -55,8 +55,11 @@ Primer arranque: el equipo crea la red WiFi **Comechismes-Setup**. Conéctate de
 elige tu WiFi y escribe la URL del servidor (`https://tu-app.vercel.app`). Después el mismo
 formulario sigue disponible en la IP del equipo. Mantener BOOT 3 s borra el WiFi.
 
+**Red alternativa:** en la página *Setup* del equipo (o con `wifi2 <ssid> <clave>` por serie) se puede
+guardar una segunda red. Si no hay conexión, cada 20 s prueba una red, alternando entre las dos.
+
 Por serie (`.venv/bin/python firmware/devcmd.py 5 "info"`): `url <u>`, `token <t>`,
-`wifi <ssid> <clave>`, `levels`, `info`, `reset`.
+`wifi <ssid> <clave>`, `wifi2 <ssid> <clave>`, `levels`, `info`, `reset`.
 
 Caras: reposo (parpadea y mira alrededor) · escuchando (ojos grandes que laten con el volumen) ·
 enviando (mira arriba + puntitos) · ok (ojos felices) · error (ojos cerrados).
