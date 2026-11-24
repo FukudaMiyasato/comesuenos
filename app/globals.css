@@ -16,7 +16,7 @@ body { font: 16px/1.4 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-
 button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
 
 .home { height: 100dvh; display: flex; flex-direction: column; overflow: hidden; }
-.home header { position: relative; flex: none; display: flex; justify-content: center; padding: 22px 16px 10px; }
+.home header { position: relative; flex: none; display: flex; justify-content: center; padding: 32px 16px 10px; }
 
 /* ---- Ojos ---- */
 .face {
@@ -37,7 +37,8 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
   background: var(--panel); border: 1px solid var(--line);
   display: flex; align-items: center; justify-content: space-around; padding: 0 4px;
 }
-.icon-switch.top-right { position: absolute; top: 22px; right: 18px; }
+/* En el home va a mitad de tamaño */
+.icon-switch.top-right { position: absolute; top: 18px; right: 18px; transform: scale(0.5); transform-origin: top right; }
 .icon-switch:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .icon-switch .thumb {
   position: absolute; top: 3px; left: 3px; width: 54px; height: 48px; border-radius: 24px;
@@ -154,7 +155,7 @@ button.skin:focus-visible { outline: 2px solid var(--text); outline-offset: 2px;
   .face { width: 104px; height: 60px; gap: 16px; }
   .eye { width: 22px; height: 28px; }
   .icon-switch { width: 92px; height: 46px; }
-  .icon-switch.top-right { top: 16px; right: 10px; }
+  .icon-switch.top-right { top: 14px; right: 12px; }
   .icon-switch .thumb { width: 42px; height: 38px; }
   .icon-switch.on .thumb { transform: translateX(42px); }
   .icon { width: 30px; height: 30px; }
