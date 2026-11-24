@@ -20,8 +20,9 @@
 #define PREROLL_MS 400               // audio previo al disparo que se conserva
 #define START_CHUNKS 3               // chunks seguidos con volumen para empezar
 #define MIN_VOICED_MS 300            // menos que esto se descarta (golpes, clics)
-#define MIN_THRESHOLD 350.0f         // umbral mínimo de RMS
-#define THRESHOLD_FACTOR 3.0f        // umbral = ruido de fondo * factor
+#define MIN_THRESHOLD 150.0f         // umbral mínimo de nivel
+#define THRESHOLD_FACTOR 4.0f        // umbral = ruido de fondo * factor
+#define LEVEL_SMOOTHING 0.3f         // suavizado del nivel (evita que picos sueltos cuenten como voz)
 
 #define STATE_POLL_MS 5000           // cada cuánto se consulta el interruptor de la web
 

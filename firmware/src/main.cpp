@@ -104,15 +104,18 @@ static void micBegin() {
 /** Lee 20 ms, los deja en `out` (16 bit) y devuelve su RMS. */
 static float micRead(int16_t *out) {
   static int32_t raw[CHUNK_SAMPLES];
-  static float dc = 0;
+  static float prevIn = 0, prevOut = 0;
   size_t got = 0;
   i2s_read(I2S_NUM_0, raw, sizeof raw, &got, portMAX_DELAY);
   int n = got / sizeof(int32_t);
   double sum = 0;
   for (int i = 0; i < n; i++) {
     float v = (float)(raw[i] >> MIC_SHIFT);
-    dc += (v - dc) * 0.002f; // quita el offset de continua
-    v -= dc;
+    // Pasa-altos ~150 Hz: quita el offset y el zumbido grave (ventiladores, red eléctrica)
+    // que sube el ruido de fondo sin aportar nada a la voz.
+    float hp = 0.944f * (prevOut + v - prevIn);
+    prevIn = v;
+    prevOut = v = hp;
     v = constrain(v, -32768.0f, 32767.0f);
     out[i] = (int16_t)v;
     sum += (double)v * v;
@@ -129,6 +132,7 @@ static int16_t *pcm;       // = wav + 44
 static int16_t *preroll;   // anillo con los últimos PREROLL_MS
 static int prerollPos = 0;
 static float noiseFloor = 120;
+static float envelope = 0;  // RMS suavizado: es lo que se compara con el umbral
 static bool debugLevels = false;
 
 static void writeWavHeader(uint32_t dataBytes) {
@@ -178,16 +182,23 @@ static void recordAndSend(float threshold) {
   }
 
   int silentMs = 0, voicedMs = START_CHUNKS * CHUNK_MS;
-  const char *why = "tiempo maximo";
+  float quietest = envelope;
+  bool timedOut = true;
   while (n + CHUNK_SAMPLES <= MAX_SAMPLES) {
     float rms = micRead(pcm + n);
     n += CHUNK_SAMPLES;
-    faceLevel(rms / (threshold * 6));
-    if (rms > threshold * 0.6f) { voicedMs += CHUNK_MS; silentMs = 0; }
+    envelope += (rms - envelope) * LEVEL_SMOOTHING;
+    quietest = min(quietest, envelope);
+    faceLevel(envelope / (threshold * 5));
+    if (envelope > threshold) { voicedMs += CHUNK_MS; silentMs = 0; }
     else silentMs += CHUNK_MS;
-    if (silentMs >= SILENCE_END_MS) { why = "silencio"; break; }
+    if (silentMs >= SILENCE_END_MS) { timedOut = false; break; }
   }
   faceLevel(0);
+  const char *why = timedOut ? "tiempo maximo" : "silencio";
+  // Si nunca hubo silencio, el ruido de fondo es más alto de lo estimado: se sube
+  // para que un ruido constante (ventilador, música) no dispare grabaciones sin fin.
+  if (timedOut) noiseFloor = max(noiseFloor, quietest * 0.8f);
 
   // Recorta el silencio final dejando un pequeño margen
   if (silentMs > 300) n -= (size_t)(silentMs - 300) / CHUNK_MS * CHUNK_SAMPLES;
@@ -299,16 +310,17 @@ void loop() {
   memcpy(preroll + prerollPos * CHUNK_SAMPLES, chunk, sizeof chunk);
   prerollPos = (prerollPos + 1) % PREROLL_CHUNKS;
 
+  envelope += (rms - envelope) * LEVEL_SMOOTHING;
   float threshold = max(MIN_THRESHOLD, noiseFloor * THRESHOLD_FACTOR);
   if (debugLevels && millis() - lastDebug > 200) {
     lastDebug = millis();
-    Serial.printf("rms=%.0f ruido=%.0f umbral=%.0f\n", rms, noiseFloor, threshold);
+    Serial.printf("rms=%.0f nivel=%.0f ruido=%.0f umbral=%.0f\n", rms, envelope, noiseFloor, threshold);
   }
 
-  if (rms > threshold) above++;
+  if (envelope > threshold) above++;
   else {
     above = 0;
-    noiseFloor += (rms - noiseFloor) * 0.02f; // el ruido de fondo solo se adapta en silencio
+    noiseFloor += (envelope - noiseFloor) * 0.02f; // el ruido de fondo solo se adapta en silencio
   }
 
   if (above >= START_CHUNKS) {
