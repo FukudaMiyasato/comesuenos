@@ -24,6 +24,4 @@
 #define THRESHOLD_FACTOR 4.0f        // umbral = ruido de fondo * factor
 #define LEVEL_SMOOTHING 0.3f         // suavizado del nivel (evita que picos sueltos cuenten como voz)
 
-#define STATE_POLL_MS 5000           // cada cuánto se consulta el interruptor de la web
-
 #define PORTAL_SSID "Comechismes-Setup"

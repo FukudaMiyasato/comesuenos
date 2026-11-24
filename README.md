@@ -21,7 +21,7 @@ En Vercel: importa el repo, añade las mismas variables de entorno y la integrac
 | Ruta | Qué hace |
 | --- | --- |
 | `POST /api/audio` | Recibe un WAV (cuerpo crudo), lo transcribe y lo guarda |
-| `GET /api/transcripts` | Últimas transcripciones (la página la consulta cada 1,5 s) |
+| `GET /api/transcripts` | Últimas transcripciones (la página la consulta cada 3 s) |
 | `DELETE /api/transcripts` | Borra la lista |
 
 ## Firmware (`firmware/`, PlatformIO + Arduino)

@@ -36,10 +36,18 @@ export default function Home() {
     setNow(Date.now());
   }, []);
 
+  // Solo se consulta con la pestaña visible, para no gastar invocaciones en segundo plano.
   useEffect(() => {
-    load();
-    const id = setInterval(load, 1500);
-    return () => clearInterval(id);
+    const tick = () => {
+      if (document.visibilityState === "visible") load();
+    };
+    tick();
+    const id = setInterval(tick, 3000);
+    document.addEventListener("visibilitychange", tick);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", tick);
+    };
   }, [load]);
 
   const clear = async () => {
@@ -58,7 +66,7 @@ export default function Home() {
     load();
   };
 
-  const fresh = items?.[0] ? now - items[0].at < 8000 : false;
+  const fresh = items?.[0] ? now - items[0].at < 10000 : false;
 
   return (
     <main>
@@ -89,7 +97,7 @@ export default function Home() {
 
       {!listening && (
         <div className="notice">
-          En pausa: el dispositivo deja de grabar y cualquier audio que llegue se descarta sin transcribir.
+          En pausa: nada se transcribe. El dispositivo se duerme en cuanto intenta enviar su próximo audio.
         </div>
       )}
 

@@ -54,26 +54,25 @@ static void setListeningEnabled(bool on) {
   showStatus();
 }
 
-/** Tarea aparte: pregunta a la web si el interruptor está encendido. */
-static void stateTask(void *) {
-  for (;;) {
-    vTaskDelay(pdMS_TO_TICKS(STATE_POLL_MS));
-    if (WiFi.status() != WL_CONNECTED || serverUrl.isEmpty()) continue;
-    String url = serverUrl + "/api/state";
-    WiFiClient plain;
-    WiFiClientSecure tls;
-    tls.setInsecure();
-    HTTPClient http;
-    if (!(url.startsWith("https://") ? http.begin(tls, url) : http.begin(plain, url))) continue;
-    http.setTimeout(8000);
-    if (http.GET() == 200) {
-      String body = http.getString();
-      body.replace(" ", "");
-      if (body.indexOf("\"listening\":false") >= 0) setListeningEnabled(false);
-      else if (body.indexOf("\"listening\":true") >= 0) setListeningEnabled(true);
-    } // si falla la consulta se conserva el último estado conocido
-    http.end();
+/** Pregunta a la web por el interruptor. Devuelve 1 (encendido), 0 (apagado) o -1 (no se pudo saber). */
+static int fetchListening() {
+  if (WiFi.status() != WL_CONNECTED || serverUrl.isEmpty()) return -1;
+  String url = serverUrl + "/api/state";
+  WiFiClient plain;
+  WiFiClientSecure tls;
+  tls.setInsecure();
+  HTTPClient http;
+  if (!(url.startsWith("https://") ? http.begin(tls, url) : http.begin(plain, url))) return -1;
+  http.setTimeout(8000);
+  int result = -1;
+  if (http.GET() == 200) {
+    String body = http.getString();
+    body.replace(" ", "");
+    if (body.indexOf("\"listening\":false") >= 0) result = 0;
+    else if (body.indexOf("\"listening\":true") >= 0) result = 1;
   }
+  http.end();
+  return result;
 }
 
 // ---------- Micrófono ----------
@@ -166,13 +165,22 @@ static bool upload(size_t samples) {
   http.end();
   Serial.printf("[upload] %u bytes -> HTTP %d en %lu ms: %s\n", (unsigned)(44 + bytes), code,
                 millis() - t0, body.substring(0, 200).c_str());
-  if (code == 200 && body.indexOf("\"listening\":false") >= 0) listeningEnabled = false;
+  if (code == 200 && body.indexOf("\"listening\":false") >= 0) setListeningEnabled(false);
   return code == 200;
 }
 
-/** Se llama al superar el umbral: graba hasta silencio o tiempo máximo y envía. */
+/**
+ * Se llama al superar el umbral: graba hasta silencio o tiempo máximo y envía.
+ *
+ * No hay sondeo periódico del interruptor de la web:
+ *  - Despierto: la respuesta de cada envío dice si hay que dormirse.
+ *  - Dormido: se sigue grabando en local sin mostrarlo; al terminar la frase se
+ *    pregunta una vez a la web y solo si el interruptor volvió a encenderse se
+ *    envía el audio. Mientras esté en pausa ningún audio sale del dispositivo.
+ */
 static void recordAndSend(float threshold) {
-  faceSet(FACE_LISTENING);
+  bool asleep = !listeningEnabled;
+  if (!asleep) faceSet(FACE_LISTENING);
   size_t n = 0;
   // Copia el pre-roll en orden cronológico
   for (int i = 0; i < PREROLL_CHUNKS; i++) {
@@ -189,7 +197,7 @@ static void recordAndSend(float threshold) {
     n += CHUNK_SAMPLES;
     envelope += (rms - envelope) * LEVEL_SMOOTHING;
     quietest = min(quietest, envelope);
-    faceLevel(envelope / (threshold * 5));
+    if (!asleep) faceLevel(envelope / (threshold * 5));
     if (envelope > threshold) { voicedMs += CHUNK_MS; silentMs = 0; }
     else silentMs += CHUNK_MS;
     if (silentMs >= SILENCE_END_MS) { timedOut = false; break; }
@@ -204,7 +212,16 @@ static void recordAndSend(float threshold) {
   if (silentMs > 300) n -= (size_t)(silentMs - 300) / CHUNK_MS * CHUNK_SAMPLES;
 
   Serial.printf("[rec] %.1f s (voz %d ms, fin por %s)\n", (float)n / SAMPLE_RATE, voicedMs, why);
-  if (voicedMs < MIN_VOICED_MS) { faceSet(FACE_IDLE); return; }
+  if (voicedMs < MIN_VOICED_MS) { showStatus(); return; }
+
+  if (asleep) {
+    if (fetchListening() != 1) { // sigue en pausa (o no se pudo saber): se descarta
+      Serial.println("[rec] en pausa, descartado");
+      i2s_zero_dma_buffer(I2S_NUM_0);
+      return;
+    }
+    setListeningEnabled(true);
+  }
 
   // Normaliza el volumen: el micro graba bajo y así se oye (y se transcribe) mejor.
   int peak = 1;
@@ -290,7 +307,6 @@ void setup() {
   faceMessage("Conectando WiFi...", "", "");
   if (wm.autoConnect(PORTAL_SSID)) wm.startWebPortal();
   showStatus();
-  xTaskCreatePinnedToCore(stateTask, "state", 12288, nullptr, 1, nullptr, 0);
 }
 
 void loop() {
@@ -309,6 +325,7 @@ void loop() {
     if (connected) {
       Serial.println("[wifi] conectado, ip " + WiFi.localIP().toString());
       wm.startWebPortal();
+      listeningEnabled = fetchListening() != 0; // estado inicial; después no se vuelve a sondear
     }
     showStatus();
   }
@@ -333,6 +350,6 @@ void loop() {
 
   if (above >= START_CHUNKS) {
     above = 0;
-    if (connected && !serverUrl.isEmpty() && listeningEnabled) recordAndSend(threshold);
+    if (connected && !serverUrl.isEmpty()) recordAndSend(threshold);
   }
 }
