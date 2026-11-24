@@ -1,4 +1,4 @@
-import { addTranscript, getListening } from "@/lib/store";
+import { addTranscript, getListening, saveAudio } from "@/lib/store";
 import { NoProviderError, transcribe } from "@/lib/transcribe";
 
 export const runtime = "nodejs";
@@ -39,19 +39,28 @@ export async function POST(req: Request) {
   if (wav.byteLength > MAX_BYTES) return Response.json({ error: "audio demasiado grande" }, { status: 413 });
 
   const seconds = Math.round(wavSeconds(wav) * 10) / 10;
-  const base = { id: crypto.randomUUID(), at: Date.now(), seconds };
+  const id = crypto.randomUUID();
+
+  // El audio se guarda siempre, así se puede escuchar aunque la transcripción falle.
+  const audio = await saveAudio(id, wav).then(
+    () => true,
+    (err) => (console.error("no se pudo guardar el audio:", err), false),
+  );
+  const base = { id, at: Date.now(), seconds, audio };
 
   try {
     const text = await transcribe(wav);
-    if (text) await addTranscript({ ...base, text });
+    await addTranscript({ ...base, text, ...(text ? {} : { note: "No se reconoció voz" }) });
     return Response.json({ ok: true, listening: true, text, seconds });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
+    if (err instanceof NoProviderError) {
+      // Sin clave: el audio llegó bien, solo queda sin transcribir.
+      await addTranscript({ ...base, text: "", note: "Sin transcribir: falta GROQ_API_KEY u OPENAI_API_KEY" });
+      return Response.json({ ok: true, listening: true, text: "", transcribed: false, seconds });
+    }
     console.error("transcripción falló:", message);
     await addTranscript({ ...base, text: message, error: true });
-    return Response.json(
-      { ok: false, error: message, seconds },
-      { status: err instanceof NoProviderError ? 503 : 502 },
-    );
+    return Response.json({ ok: false, error: message, seconds }, { status: 502 });
   }
 }

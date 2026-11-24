@@ -2,7 +2,15 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-type Transcript = { id: string; text: string; at: number; seconds: number; error?: boolean };
+type Transcript = {
+  id: string;
+  text: string;
+  at: number;
+  seconds: number;
+  error?: boolean;
+  audio?: boolean;
+  note?: string;
+};
 
 const time = new Intl.DateTimeFormat("es", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 
@@ -91,7 +99,8 @@ export default function Home() {
         <ol>
           {items.map((t) => (
             <li key={t.id} className={t.error ? "error" : undefined}>
-              <p className="text">{t.text}</p>
+              {t.text ? <p className="text">{t.text}</p> : <p className="note">{t.note ?? "Sin texto"}</p>}
+              {t.audio && <audio controls preload="none" src={`/api/audio/${t.id}`} />}
               <div className="meta">
                 {time.format(t.at)} · {t.seconds.toFixed(1)} s{t.error ? " · error al transcribir" : ""}
               </div>

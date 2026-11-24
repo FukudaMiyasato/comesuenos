@@ -206,6 +206,14 @@ static void recordAndSend(float threshold) {
   Serial.printf("[rec] %.1f s (voz %d ms, fin por %s)\n", (float)n / SAMPLE_RATE, voicedMs, why);
   if (voicedMs < MIN_VOICED_MS) { faceSet(FACE_IDLE); return; }
 
+  // Normaliza el volumen: el micro graba bajo y así se oye (y se transcribe) mejor.
+  int peak = 1;
+  for (size_t i = 0; i < n; i++) peak = max(peak, abs((int)pcm[i]));
+  float gain = min(24.0f, 24000.0f / peak);
+  if (gain > 1.05f)
+    for (size_t i = 0; i < n; i++) pcm[i] = (int16_t)(pcm[i] * gain);
+  Serial.printf("[rec] pico %d, ganancia x%.1f\n", peak, gain);
+
   faceSet(FACE_THINKING);
   bool ok = WiFi.status() == WL_CONNECTED && upload(n);
   if (!listeningEnabled) faceSet(FACE_SLEEP);
