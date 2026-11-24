@@ -1,11 +1,11 @@
-import { clearTranscripts, listTranscripts, persistent } from "@/lib/store";
+import { clearTranscripts, getListening, listTranscripts, persistent } from "@/lib/store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   return Response.json(
-    { transcripts: await listTranscripts(), persistent },
+    { transcripts: await listTranscripts(), persistent, listening: await getListening() },
     { headers: { "Cache-Control": "no-store" } },
   );
 }

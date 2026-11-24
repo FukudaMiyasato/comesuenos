@@ -101,6 +101,12 @@ static void faceTask(void *) {
         tGazeY = 6 * S;
         tH = 8 * S;
         break;
+      case FACE_SLEEP: // en pausa: ojos cerrados que "respiran"
+        tGazeX = 0;
+        tGazeY = (8 + 2 * sinf(now / 900.0f)) * S;
+        tW = 32;
+        tH = 3;
+        break;
       default: break;
     }
 
@@ -125,6 +131,12 @@ static void faceTask(void *) {
     if (s == FACE_THINKING) { // tres puntitos animados
       int n = (age / 300) % 4;
       for (int i = 0; i < n; i++) oled.drawDisc(56 + i * 8, H - 4, H == 32 ? 1 : 2);
+    }
+
+    if (s == FACE_SLEEP) { // "z z" subiendo
+      oled.setFont(u8g2_font_5x8_tf);
+      int k = (now / 700) % 3;
+      for (int i = 0; i <= k; i++) oled.drawStr(104 + i * 7, (H == 32 ? 14 : 24) - i * (H == 32 ? 4 : 7), "z");
     }
 
     oled.sendBuffer();

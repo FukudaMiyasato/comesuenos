@@ -23,4 +23,6 @@
 #define MIN_THRESHOLD 350.0f         // umbral mínimo de RMS
 #define THRESHOLD_FACTOR 3.0f        // umbral = ruido de fondo * factor
 
+#define STATE_POLL_MS 5000           // cada cuánto se consulta el interruptor de la web
+
 #define PORTAL_SSID "Comesuenos-Setup"

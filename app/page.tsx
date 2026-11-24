@@ -10,15 +10,17 @@ export default function Home() {
   const [items, setItems] = useState<Transcript[] | null>(null);
   const [persistent, setPersistent] = useState(true);
   const [offline, setOffline] = useState(false);
+  const [listening, setListening] = useState(true);
   const [now, setNow] = useState(() => Date.now());
 
   const load = useCallback(async () => {
     try {
       const res = await fetch("/api/transcripts", { cache: "no-store" });
       if (!res.ok) throw new Error(String(res.status));
-      const data = (await res.json()) as { transcripts: Transcript[]; persistent: boolean };
+      const data = (await res.json()) as { transcripts: Transcript[]; persistent: boolean; listening: boolean };
       setItems(data.transcripts);
       setPersistent(data.persistent);
+      setListening(data.listening);
       setOffline(false);
     } catch {
       setOffline(true);
@@ -37,12 +39,23 @@ export default function Home() {
     load();
   };
 
+  const toggle = async () => {
+    const next = !listening;
+    setListening(next); // respuesta inmediata; el sondeo confirma el valor real
+    await fetch("/api/state", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ listening: next }),
+    }).catch(() => {});
+    load();
+  };
+
   const fresh = items?.[0] ? now - items[0].at < 8000 : false;
 
   return (
     <main>
       <header>
-        <div className={`face${fresh ? " fresh" : ""}`} aria-hidden>
+        <div className={`face${fresh ? " fresh" : ""}${listening ? "" : " asleep"}`} aria-hidden>
           <span className="eye" />
           <span className="eye" />
         </div>
@@ -51,6 +64,11 @@ export default function Home() {
           <p className="sub">Lo que escucha el ESP32, transcrito en vivo</p>
         </div>
         <span className="spacer" />
+        <label className="switch">
+          <input type="checkbox" role="switch" checked={listening} onChange={toggle} />
+          <span className="track" aria-hidden />
+          <span>{listening ? "Escuchando" : "En pausa"}</span>
+        </label>
         {items && items.length > 0 && <button onClick={clear}>Limpiar</button>}
       </header>
 
@@ -61,8 +79,14 @@ export default function Home() {
         </div>
       )}
 
+      {!listening && (
+        <div className="notice">
+          En pausa: el dispositivo deja de grabar y cualquier audio que llegue se descarta sin transcribir.
+        </div>
+      )}
+
       {items === null ? null : items.length === 0 ? (
-        <p className="empty">Esperando a que el dispositivo escuche algo…</p>
+        <p className="empty">{listening ? "Esperando a que el dispositivo escuche algo…" : "Escucha en pausa."}</p>
       ) : (
         <ol>
           {items.map((t) => (

@@ -1,4 +1,4 @@
-import { addTranscript } from "@/lib/store";
+import { addTranscript, getListening } from "@/lib/store";
 import { NoProviderError, transcribe } from "@/lib/transcribe";
 
 export const runtime = "nodejs";
@@ -28,6 +28,12 @@ export async function POST(req: Request) {
     return Response.json({ error: "token inválido" }, { status: 401 });
   }
 
+  // Interruptor apagado: se descarta el audio sin llamar al servicio de transcripción.
+  if (!(await getListening())) {
+    await req.body?.cancel().catch(() => {});
+    return Response.json({ ok: true, listening: false, text: "" });
+  }
+
   const wav = await req.arrayBuffer();
   if (wav.byteLength < 44) return Response.json({ error: "audio vacío" }, { status: 400 });
   if (wav.byteLength > MAX_BYTES) return Response.json({ error: "audio demasiado grande" }, { status: 413 });
@@ -38,7 +44,7 @@ export async function POST(req: Request) {
   try {
     const text = await transcribe(wav);
     if (text) await addTranscript({ ...base, text });
-    return Response.json({ ok: true, text, seconds });
+    return Response.json({ ok: true, listening: true, text, seconds });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error("transcripción falló:", message);

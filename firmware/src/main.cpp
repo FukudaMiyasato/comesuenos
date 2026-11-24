@@ -35,13 +35,44 @@ static void setToken(String t) {
   prefs.putString("token", t);
 }
 
+static volatile bool listeningEnabled = true; // interruptor de la web
+
 static void showStatus() {
   if (WiFi.status() != WL_CONNECTED) {
     faceMessage("Configura el WiFi:", "conectate a la red", PORTAL_SSID);
   } else if (serverUrl.isEmpty()) {
     faceMessage("Falta URL servidor", "abre en el navegador", WiFi.localIP().toString().c_str());
   } else {
-    faceSet(FACE_IDLE);
+    faceSet(listeningEnabled ? FACE_IDLE : FACE_SLEEP);
+  }
+}
+
+static void setListeningEnabled(bool on) {
+  if (on == listeningEnabled) return;
+  listeningEnabled = on;
+  Serial.printf("[estado] %s\n", on ? "escuchando" : "en pausa");
+  showStatus();
+}
+
+/** Tarea aparte: pregunta a la web si el interruptor está encendido. */
+static void stateTask(void *) {
+  for (;;) {
+    vTaskDelay(pdMS_TO_TICKS(STATE_POLL_MS));
+    if (WiFi.status() != WL_CONNECTED || serverUrl.isEmpty()) continue;
+    String url = serverUrl + "/api/state";
+    WiFiClient plain;
+    WiFiClientSecure tls;
+    tls.setInsecure();
+    HTTPClient http;
+    if (!(url.startsWith("https://") ? http.begin(tls, url) : http.begin(plain, url))) continue;
+    http.setTimeout(8000);
+    if (http.GET() == 200) {
+      String body = http.getString();
+      body.replace(" ", "");
+      if (body.indexOf("\"listening\":false") >= 0) setListeningEnabled(false);
+      else if (body.indexOf("\"listening\":true") >= 0) setListeningEnabled(true);
+    } // si falla la consulta se conserva el último estado conocido
+    http.end();
   }
 }
 
@@ -131,6 +162,7 @@ static bool upload(size_t samples) {
   http.end();
   Serial.printf("[upload] %u bytes -> HTTP %d en %lu ms: %s\n", (unsigned)(44 + bytes), code,
                 millis() - t0, body.substring(0, 200).c_str());
+  if (code == 200 && body.indexOf("\"listening\":false") >= 0) listeningEnabled = false;
   return code == 200;
 }
 
@@ -165,7 +197,8 @@ static void recordAndSend(float threshold) {
 
   faceSet(FACE_THINKING);
   bool ok = WiFi.status() == WL_CONNECTED && upload(n);
-  faceSet(ok ? FACE_HAPPY : FACE_SAD);
+  if (!listeningEnabled) faceSet(FACE_SLEEP);
+  else faceSet(ok ? FACE_HAPPY : FACE_SAD);
   i2s_zero_dma_buffer(I2S_NUM_0);
 }
 
@@ -188,8 +221,9 @@ static void handleSerial() {
     }
     else if (line == "levels") { debugLevels = !debugLevels; }
     else if (line == "info") {
-      Serial.printf("wifi=%s ip=%s url=%s ruido=%.0f psram=%u\n", WiFi.SSID().c_str(),
-                    WiFi.localIP().toString().c_str(), serverUrl.c_str(), noiseFloor, ESP.getFreePsram());
+      Serial.printf("wifi=%s ip=%s url=%s escucha=%d ruido=%.0f psram=%u\n", WiFi.SSID().c_str(),
+                    WiFi.localIP().toString().c_str(), serverUrl.c_str(), (int)listeningEnabled, noiseFloor,
+                    ESP.getFreePsram());
     }
     else if (line == "reset") { wm.resetSettings(); prefs.clear(); ESP.restart(); }
     else if (line.length()) Serial.println("comandos: url <u> | token <t> | wifi <ssid> <clave> | levels | info | reset");
@@ -237,6 +271,7 @@ void setup() {
   faceMessage("Conectando WiFi...", "", "");
   if (wm.autoConnect(PORTAL_SSID)) wm.startWebPortal();
   showStatus();
+  xTaskCreatePinnedToCore(stateTask, "state", 12288, nullptr, 1, nullptr, 0);
 }
 
 void loop() {
@@ -278,6 +313,6 @@ void loop() {
 
   if (above >= START_CHUNKS) {
     above = 0;
-    if (connected && !serverUrl.isEmpty()) recordAndSend(threshold);
+    if (connected && !serverUrl.isEmpty() && listeningEnabled) recordAndSend(threshold);
   }
 }

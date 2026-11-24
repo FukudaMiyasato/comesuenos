@@ -1,7 +1,7 @@
 #pragma once
 #include <Arduino.h>
 
-enum FaceState { FACE_IDLE, FACE_LISTENING, FACE_THINKING, FACE_HAPPY, FACE_SAD, FACE_MESSAGE };
+enum FaceState { FACE_IDLE, FACE_LISTENING, FACE_THINKING, FACE_HAPPY, FACE_SAD, FACE_SLEEP, FACE_MESSAGE };
 
 void faceBegin();
 void faceSet(FaceState s);

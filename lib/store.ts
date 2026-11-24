@@ -26,8 +26,21 @@ async function redis<T>(...command: (string | number)[]): Promise<T> {
 }
 
 // Sin Redis (desarrollo local) se guarda en memoria del proceso.
-const g = globalThis as unknown as { __comesuenos?: Transcript[] };
+const g = globalThis as unknown as { __comesuenos?: Transcript[]; __comesuenosOn?: boolean };
 const memory = (g.__comesuenos ??= []);
+
+const LISTENING_KEY = "comesuenos:listening";
+
+/** Interruptor de la web: si está apagado no se transcribe nada. Encendido por defecto. */
+export async function getListening(): Promise<boolean> {
+  if (persistent) return (await redis<string | null>("GET", LISTENING_KEY)) !== "0";
+  return g.__comesuenosOn ?? true;
+}
+
+export async function setListening(on: boolean): Promise<void> {
+  if (persistent) await redis("SET", LISTENING_KEY, on ? "1" : "0");
+  else g.__comesuenosOn = on;
+}
 
 export async function addTranscript(t: Transcript): Promise<void> {
   if (persistent) {
