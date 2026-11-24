@@ -5,21 +5,21 @@ import type { Mention, Sentiment } from "./store";
 // interruptor "datos falsos" de /admin esté activo.
 
 const TOPICS: [string, Sentiment, number][] = [
-  ["trabajo", "negativo", 8],
-  ["trabajo", "positivo", 4],
-  ["familia", "positivo", 6],
-  ["familia", "negativo", 2],
-  ["comida", "positivo", 5],
-  ["dinero", "negativo", 5],
-  ["dinero", "neutral", 2],
-  ["chismes", "neutral", 4],
-  ["chismes", "negativo", 3],
-  ["salud", "negativo", 3],
-  ["salud", "positivo", 1],
-  ["pareja", "positivo", 2],
-  ["clima", "neutral", 2],
-  ["fútbol", "positivo", 2],
-  ["tráfico", "negativo", 1],
+  ["atención", "negativo", 7],
+  ["atención", "positivo", 5],
+  ["comida", "positivo", 8],
+  ["comida", "negativo", 3],
+  ["limpieza", "negativo", 5],
+  ["limpieza", "positivo", 2],
+  ["bulla", "negativo", 5],
+  ["bulla", "neutral", 1],
+  ["local", "positivo", 3],
+  ["local", "neutral", 2],
+  ["local", "negativo", 1],
+  ["variedad", "positivo", 3],
+  ["variedad", "negativo", 2],
+  ["precio", "negativo", 2],
+  ["espera", "negativo", 1],
 ]; // suman 50
 
 /** Generador pseudoaleatorio con semilla fija: los mismos datos en cada consulta. */

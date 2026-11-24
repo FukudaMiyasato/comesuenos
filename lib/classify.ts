@@ -35,13 +35,18 @@ export function classificationInfo(): { provider: string; model: string; fallbac
   };
 }
 
-const SYSTEM = `Clasificas frases cortas en español transcritas de voz. Responde solo JSON:
+/** Temas de partida de un local de comida rápida. Siempre se ofrecen al modelo, aunque aún no tengan datos. */
+export const BASE_CATEGORIES = ["limpieza", "atención", "local", "comida", "variedad", "bulla"];
+
+const SYSTEM = `Clasificas frases cortas en español, transcritas de voz, dichas por clientes dentro de un local de comida rápida. Responde solo JSON:
 {"sentimiento":"positivo"|"neutral"|"negativo","categorias":["..."]}
 Reglas:
-- "sentimiento": tono emocional de la frase. Usa "neutral" si no está claro.
-- "categorias": de 1 a 3 temas de los que trata la frase.
-- PRIMERO reutiliza categorías de la lista EXISTENTES, copiando su nombre exacto, siempre que encajen razonablemente.
-- Solo si ninguna encaja, crea una nueva: general y reutilizable, 1 o 2 palabras, en minúsculas, en español (por ejemplo "trabajo", "familia", "comida").`;
+- "sentimiento": tono de la frase respecto a su experiencia. Usa "neutral" si no está claro.
+- "categorias": de 1 a 3 aspectos del local de los que trata la frase.
+- PRIMERO reutiliza categorías de la lista EXISTENTES, copiando su nombre exacto, siempre que encajen razonablemente. Guía de las principales:
+  limpieza (mesas, baños, suciedad), atención (trato del personal, rapidez, errores en el pedido), local (espacio, asientos, temperatura, decoración), comida (sabor, calidad, porciones), variedad (opciones del menú), bulla (ruido, música alta).
+- Solo si ninguna encaja, crea una nueva: un aspecto general y reutilizable del local, 1 o 2 palabras, en minúsculas, en español (por ejemplo "precio" o "espera").
+- Si la frase no tiene nada que ver con el local, usa la categoría "otros".`;
 
 const SENTIMENTS: Sentiment[] = ["positivo", "neutral", "negativo"];
 
@@ -52,7 +57,9 @@ export async function classify(text: string, existing: string[]): Promise<Classi
   const p = provider();
   if (!p) return null;
 
-  const user = `EXISTENTES: ${existing.length ? existing.join(", ") : "(ninguna todavía)"}\nFRASE: ${text.slice(0, 1200)}`;
+  // Las de partida van primero; después, las que se hayan ido creando.
+  existing = [...new Set([...BASE_CATEGORIES, ...existing])];
+  const user = `EXISTENTES: ${existing.join(", ")}\nFRASE: ${text.slice(0, 1200)}`;
 
   for (const model of p.models) {
     const res = await fetch(p.url, {

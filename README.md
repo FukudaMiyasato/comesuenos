@@ -41,6 +41,10 @@ La clasificación usa el modelo de chat más barato (`gpt-4.1-nano`, con `gpt-4o
 con solo clave de Groq, `llama-3.1-8b-instant`). `CLASSIFY_MODEL` permite forzar otro. Antes de
 crear una categoría nueva se le pasan las existentes para que las reutilice.
 
+Las categorías están orientadas a un local de comida rápida: se parte de `limpieza`, `atención`,
+`local`, `comida`, `variedad` y `bulla` (ver `BASE_CATEGORIES` en `lib/classify.ts`), y el modelo
+puede añadir otras si ninguna encaja.
+
 ## Firmware (`firmware/`, PlatformIO + Arduino)
 
 Placa: ESP32-S3 N16R8 tipo "bread-compact" — OLED SSD1306 (SDA 41, SCL 42),

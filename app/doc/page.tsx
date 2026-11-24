@@ -49,8 +49,8 @@ export default function Doc() {
       </p>
       <h1>Comechismes</h1>
       <p className="lead">
-        Un dispositivo con ojos que escucha lo que se dice a su alrededor y dibuja de qué temas se habla y con qué
-        tono. No guarda ni el audio ni las palabras: solo el tema, el tono y la hora.
+        Un dispositivo con ojos que escucha lo que comentan los clientes en un local de comida rápida y dibuja de
+        qué aspectos se habla y con qué tono. No guarda ni el audio ni las palabras: solo el tema, el tono y la hora.
       </p>
 
       <section>
@@ -131,7 +131,8 @@ export default function Doc() {
           </Step>
           <Branch>Si no se reconoce ninguna palabra: no se guarda nada y el flujo termina aquí.</Branch>
           <Step n={5} title="Categorías que ya existen" where="Web">
-            Se leen de la base de datos las categorías usadas hasta ahora, de la más frecuente a la menos (hasta 60).
+            Se parte de seis temas fijos de un local de comida rápida (limpieza, atención, local, comida, variedad y
+            bulla) y se añaden las categorías que se hayan ido creando, de la más frecuente a la menos.
           </Step>
           <Step
             n={6}
@@ -143,9 +144,10 @@ export default function Doc() {
                 : "Sin clave configurada en este servidor"
             }
           >
-            Un modelo de chat pequeño recibe la frase y la lista de categorías existentes. Devuelve un JSON con el
-            sentimiento (positivo, neutral o negativo) y de 1 a 3 categorías. La instrucción le obliga a reutilizar
-            una existente si encaja y a crear una nueva solo si ninguna sirve.
+            Un modelo de chat pequeño recibe la frase y la lista de categorías existentes, con la indicación de que
+            son comentarios de clientes en el local. Devuelve un JSON con el sentimiento (positivo, neutral o
+            negativo) y de 1 a 3 categorías. La instrucción le obliga a reutilizar una existente si encaja y a crear
+            una nueva solo si ninguna sirve (por ejemplo «precio» o «espera»). Lo que no trata del local va a «otros».
           </Step>
           <Branch>
             Si esta llamada falla: no se guarda nada y la frase se pierde.
