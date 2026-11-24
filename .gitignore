@@ -1,0 +1,12 @@
+node_modules/
+.next/
+.env
+.env*.local
+.vercel/
+.venv/
+.pio/
+firmware/backup/
+firmware/include/secrets.h
+*.tsbuildinfo
+next-env.d.ts
+.DS_Store
