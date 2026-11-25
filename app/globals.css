@@ -131,7 +131,7 @@ button.skin:focus-visible { outline: 2px solid var(--text); outline-offset: 2px;
 .neu { --c: var(--neu); --on: #f3f5f9; }
 
 .top { list-style: none; padding: 0; margin-top: 0; margin-bottom: 30px; display: grid; gap: 7px; }
-.top li { display: grid; grid-template-columns: 210px 1fr 26px; align-items: center; gap: 12px; font-size: 14px; }
+.top li { display: grid; grid-template-columns: 110px 1fr 26px; align-items: center; gap: 12px; font-size: 14px; }
 .top .label { text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .top .bar { display: flex; height: 10px; border-radius: 5px; overflow: hidden; min-width: 10px; }
 .top .bar i { background: rgb(var(--c)); min-width: 3px; }
@@ -184,7 +184,7 @@ button.skin:focus-visible { outline: 2px solid var(--text); outline-offset: 2px;
   .icon-switch .thumb { width: 42px; height: 38px; }
   .icon-switch.on .thumb { transform: translateX(42px); }
   .icon { width: 30px; height: 30px; }
-  .top li { grid-template-columns: 132px 1fr 22px; }
+  .top li { grid-template-columns: 86px 1fr 22px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .bubble.pulse .skin { animation: glow 0.9s ease-in-out 5; }

@@ -41,9 +41,9 @@ La clasificación usa un modelo de chat barato (`gpt-4o-mini`;
 con solo clave de Groq, `llama-3.1-8b-instant`). `CLASSIFY_MODEL` permite forzar otro. Antes de
 crear una categoría nueva se le pasan las existentes para que las reutilice.
 
-Las categorías son frases cortas que dicen qué opina o de qué habla la persona («le gusta la comida»,
-«la atención es lenta», «habla de su trabajo»). Se parte de las de `BASE_CATEGORIES` en `lib/classify.ts`
-y el modelo crea las que hagan falta. Se clasifica todo; solo se descarta el ruido o lo ininteligible.
+Las categorías son temas generales de una o dos palabras. Se parte de `comida`, `atención`, `local`,
+`limpieza`, `variedad`, `bulla` y `precio` (ver `BASE_CATEGORIES` en `lib/classify.ts`) y el modelo crea
+otras cuando hace falta («trabajo», «deportes»). Se clasifica todo; solo se descarta el ruido o lo ininteligible.
 
 ## Todo en la Mac (modelos locales, sin ESP32)
 

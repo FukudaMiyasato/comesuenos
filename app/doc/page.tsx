@@ -157,8 +157,8 @@ export default function Doc() {
           </Step>
           <Branch>Si no se reconoce ninguna palabra: no se guarda nada y el flujo termina aquí.</Branch>
           <Step n={5} title="Categorías que ya existen" where="Web" cost={FREE}>
-            Se parte de unas frases fijas de un local de comida rápida («le gusta la comida», «la atención es lenta»,
-            «el local está sucio»…) y se añaden las que se hayan ido creando, de la más frecuente a la menos.
+            Se parte de unos temas fijos de un local de comida rápida (comida, atención, local, limpieza, variedad,
+            bulla y precio) y se añaden los que se hayan ido creando, de la más frecuente a la menos.
           </Step>
           <Step
             n={6}
@@ -173,10 +173,9 @@ export default function Doc() {
           >
             Un modelo de chat pequeño recibe la frase y la lista de categorías existentes, con la indicación de que
             son comentarios de clientes en el local. Devuelve un JSON con el sentimiento (positivo, neutral o
-            negativo) y 1 o 2 categorías, que son frases cortas sobre qué opina o de qué habla la persona («no le
-            gusta el local», «habla de su trabajo»). La instrucción le obliga a reutilizar una existente si significa
-            lo mismo y a crear una nueva solo si ninguna sirve. Se clasifica todo: solo se descarta el ruido o lo
-            ininteligible.
+            negativo) y la categoría: un tema general de una o dos palabras. La instrucción le obliga a reutilizar
+            una existente si sirve y a crear una nueva solo si ninguna encaja (por ejemplo «trabajo» o «deportes»).
+            Se clasifica todo: solo se descarta el ruido o lo ininteligible.
           </Step>
           <Branch>
             Si esta llamada falla: no se guarda nada y la frase se pierde.

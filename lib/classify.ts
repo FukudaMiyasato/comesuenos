@@ -47,36 +47,26 @@ export function classificationInfo(): { provider: string; model: string; fallbac
   };
 }
 
-/** Frases de partida para un local de comida rápida. Siempre se ofrecen al modelo, aunque aún no tengan datos. */
-export const BASE_CATEGORIES = [
-  "le gusta la comida",
-  "no le gusta la comida",
-  "la atención es buena",
-  "la atención es lenta",
-  "el local está sucio",
-  "le gusta el local",
-  "no le gusta el local",
-  "le molesta el ruido",
-  "hay poca variedad",
-  "los precios son altos",
-];
+/** Temas de partida de un local de comida rápida. Siempre se ofrecen al modelo, aunque aún no tengan datos. */
+export const BASE_CATEGORIES = ["comida", "atención", "local", "limpieza", "variedad", "bulla", "precio"];
 
-const SYSTEM = `Resumes en una frase corta lo que dice una persona. Recibes una FRASE en español, transcrita de voz, y una lista de categorías EXISTENTES. Responde solo JSON:
+const SYSTEM = `Clasificas por tema lo que dice una persona. Recibes una FRASE en español, transcrita de voz, y una lista de categorías EXISTENTES. Responde solo JSON:
 {"sentimiento":"positivo"|"neutral"|"negativo","categoria":"..."}
 Reglas:
-- "categoria": frase corta (3 a 6 palabras, minúsculas, sin punto) que diga qué opina o de qué habla la persona, en tercera persona.
-- Si una de las EXISTENTES significa lo mismo, cópiala exacta. Si ninguna encaja de verdad, crea una nueva: general y reutilizable, sin nombres propios ni detalles concretos.
-- La frase puede tratar de cualquier tema (el local, la comida, el trabajo, la familia, deportes...): siempre se resume, nunca se rechaza.
-- Nunca respondas una sola palabra ni etiquetas vagas como "otros", "random", "varios" o "general".
+- "categoria": el tema general de la frase, en 1 o 2 palabras, en minúsculas.
+- Si una de las EXISTENTES sirve, cópiala exacta. Guía: comida (sabor, calidad, porciones), atención (trato del personal, rapidez, errores, colas), local (espacio, asientos, temperatura, ambiente), limpieza (mesas, baños, suciedad), variedad (opciones del menú), bulla (ruido, música alta), precio.
+- Si ninguna encaja de verdad, crea una nueva igual de general y reutilizable (por ejemplo "trabajo", "familia", "deportes", "compras", "salud").
+- La frase puede tratar de cualquier tema: siempre se clasifica, nunca se rechaza.
+- Nunca uses etiquetas vagas como "otros", "random", "varios" o "general".
 - "sentimiento": tono de la frase; "neutral" si no está claro.`;
 
 // Ejemplos resueltos: a un modelo pequeño le ayudan más que cualquier explicación.
 const EXAMPLES: [string, Sentiment, string][] = [
-  ["El pollo está riquísimo", "positivo", "le gusta la comida"],
-  ["Qué lentos son para atender, llevo media hora", "negativo", "la atención es lenta"],
-  ["Mañana tengo reunión con mi jefe a las ocho", "neutral", "habla de su trabajo"],
-  ["Ganó mi equipo anoche, qué partidazo", "positivo", "comenta un partido de fútbol"],
-  ["Esa música está demasiado fuerte", "negativo", "le molesta el ruido"],
+  ["El pollo está riquísimo", "positivo", "comida"],
+  ["Qué lentos son para atender, llevo media hora", "negativo", "atención"],
+  ["Mañana tengo reunión con mi jefe a las ocho", "neutral", "trabajo"],
+  ["Ganó mi equipo anoche, qué partidazo", "positivo", "deportes"],
+  ["Esa música está demasiado fuerte", "negativo", "bulla"],
 ];
 
 const ask = (existing: string[], text: string) => `EXISTENTES: ${existing.join(", ")}\nFRASE: ${text}`;
@@ -112,8 +102,9 @@ export async function classify(text: string, existing: string[]): Promise<Classi
   if (!p || isNoise(text)) return null;
 
   // Las de partida van primero; después, las que se hayan ido creando.
-  // Solo frases: las categorías de una palabra de versiones anteriores no se ofrecen para reutilizar.
-  existing = [...new Set([...BASE_CATEGORIES, ...existing])].filter((c) => c.includes(" ") && !DISCARDED.has(fold(c)));
+  // Solo temas cortos: las categorías en forma de frase de una versión anterior no se ofrecen para reutilizar.
+  const short = (c: string) => c.split(" ").length <= 2;
+  existing = [...new Set([...BASE_CATEGORIES, ...existing])].filter((c) => short(c) && !DISCARDED.has(fold(c)));
   const messages = [
     { role: "system", content: SYSTEM },
     ...EXAMPLES.flatMap(([phrase, sentimiento, categoria]) => [
@@ -149,9 +140,9 @@ export async function classify(text: string, existing: string[]): Promise<Classi
       const categories: string[] = [];
       for (const c of [raw.categoria, ...(Array.isArray(raw.categorias) ? raw.categorias : [])]) {
         if (typeof c !== "string") continue;
-        const name = String(c).toLowerCase().trim().replace(/\s+/g, " ").replace(/[.!¡¿?]+$/, "").slice(0, 48);
-        // Una sola palabra o una etiqueta comodín no sirve como categoría.
-        if (!name.includes(" ") || DISCARDED.has(fold(name))) continue;
+        const name = String(c).toLowerCase().trim().replace(/\s+/g, " ").replace(/[.!¡¿?]+$/, "").slice(0, 30);
+        // Una etiqueta comodín o una frase larga no sirve como categoría.
+        if (!name || !short(name) || DISCARDED.has(fold(name))) continue;
         const final = byFold.get(fold(name)) ?? name;
         if (!categories.includes(final)) categories.push(final);
         if (categories.length === 2) break;
