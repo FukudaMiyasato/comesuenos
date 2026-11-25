@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { keyOf, TONE, type Bubble } from "./types";
 
-type Node = { x: number; y: number; vx: number; vy: number; r: number; target: number };
+type Node = { x: number; y: number; vx: number; vy: number; r: number; target: number; category: string };
 
 const GAP = 8;
 const time = new Intl.DateTimeFormat("es", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
@@ -53,7 +53,10 @@ export default function Bubbles({ bubbles, pulsing }: { bubbles: Bubble[]; pulsi
 
       // Radio = k·√(nº de textos): el área es proporcional a la cantidad.
       const total = categories.reduce((s, c) => s + c.count, 0);
-      const k = Math.min(Math.sqrt((W * H * 0.3) / (Math.PI * Math.max(total, 1))), Math.min(W, H) * 0.2);
+      const k = Math.min(Math.sqrt((W * H * 0.31) / (Math.PI * Math.max(total, 1))), Math.min(W, H) * 0.22);
+      // La atracción al centro se reparte según la forma del área: en una ventana ancha el grupo se ensancha.
+      const gx = 0.0035 * Math.sqrt(H / W);
+      const gy = 0.0035 * Math.sqrt(W / H);
       const big = Math.max(120, Math.min(W, H) * 0.47);
 
       const names = new Set(categories.map((c) => c.name));
@@ -63,13 +66,27 @@ export default function Bubbles({ bubbles, pulsing }: { bubbles: Bubble[]; pulsi
         if (!n) {
           const a = Math.random() * Math.PI * 2;
           const d = Math.min(W, H) * 0.3;
-          n = { x: cx + Math.cos(a) * d, y: cy + Math.sin(a) * d, vx: 0, vy: 0, r: 0, target: 0 };
+          n = { x: cx + Math.cos(a) * d, y: cy + Math.sin(a) * d, vx: 0, vy: 0, r: 0, target: 0, category: c.category };
           map.set(c.name, n);
         }
         n.target = c.name === selected ? big : Math.max(30, k * Math.sqrt(c.count));
       }
 
       const list = [...map.entries()];
+      // Los círculos de una misma categoría (uno azul, otro rojo) se buscan para quedar pegados.
+      for (let i = 0; i < list.length; i++) {
+        for (let j = i + 1; j < list.length; j++) {
+          const a = list[i][1];
+          const b = list[j][1];
+          if (a.category !== b.category) continue;
+          const dx = b.x - a.x;
+          const dy = b.y - a.y;
+          const d = Math.hypot(dx, dy) || 1;
+          const pull = Math.max(0, d - (a.r + b.r + GAP)) * 0.03;
+          a.vx += (dx / d) * pull; a.vy += (dy / d) * pull;
+          b.vx -= (dx / d) * pull; b.vy -= (dy / d) * pull;
+        }
+      }
       for (const [name, n] of list) {
         n.r += (n.target - n.r) * 0.14;
         if (name === selected) {
@@ -77,8 +94,8 @@ export default function Bubbles({ bubbles, pulsing }: { bubbles: Bubble[]; pulsi
           n.y += (cy - n.y) * 0.18;
           n.vx = n.vy = 0;
         } else {
-          n.vx = (n.vx + (cx - n.x) * 0.003) * 0.86;
-          n.vy = (n.vy + (cy - n.y) * 0.004) * 0.86;
+          n.vx = (n.vx + (cx - n.x) * gx) * 0.86;
+          n.vy = (n.vy + (cy - n.y) * gy) * 0.86;
           n.x += n.vx;
           n.y += n.vy;
         }

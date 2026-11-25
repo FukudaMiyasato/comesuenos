@@ -7,7 +7,7 @@ ROOT=$(cd .. && pwd)
 [ -x engines/bin/whisper-server ] || python3 scripts/bundle-engines.py
 
 echo "→ Compilando la web…"
-(cd "$ROOT" && rm -rf .next && BUILD_STANDALONE=1 node_modules/.bin/next build)
+(cd "$ROOT" && rm -rf .next && BUILD_STANDALONE=1 NEXT_PUBLIC_DESKTOP=1 node_modules/.bin/next build)
 
 echo "→ Empaquetando la app…"
 rm -rf dist
