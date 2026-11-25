@@ -75,14 +75,24 @@ const defaults: Settings = { listening: true, fake: false };
 
 const parse = <T>(raw: string | null, fallback: T): T => (raw ? { ...fallback, ...(JSON.parse(raw) as T) } : fallback);
 
+// "otros" existió en versiones anteriores como cajón de sastre; ya no se muestra ni se conserva.
+const LEGACY_CATEGORIES = new Set(["otros"]);
+function prune(data: Data): Data {
+  for (const key of Object.keys(data.bubbles)) {
+    if (LEGACY_CATEGORIES.has(key.slice(0, key.lastIndexOf("|")))) delete data.bubbles[key];
+  }
+  data.recent = data.recent.filter((m) => !LEGACY_CATEGORIES.has(m[0]));
+  return data;
+}
+
 /** Datos y ajustes en una sola lectura (un único comando de Redis por consulta). */
 export async function readAll(): Promise<{ data: Data; settings: Settings }> {
   if (persistent) {
     const [d, s] = await redis<(string | null)[]>("MGET", DATA_KEY, SETTINGS_KEY);
-    return { data: parse(d, emptyData()), settings: parse(s, defaults) };
+    return { data: prune(parse(d, emptyData())), settings: parse(s, defaults) };
   }
   loadFile();
-  return { data: g.__comechismesData ?? emptyData(), settings: g.__comechismesSettings ?? defaults };
+  return { data: prune(g.__comechismesData ?? emptyData()), settings: g.__comechismesSettings ?? defaults };
 }
 
 export async function getSettings(): Promise<Settings> {

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Bubbles from "./Bubbles";
 import Timeline from "./Timeline";
+import VolumeMeter from "./VolumeMeter";
 import ViewSwitch, { type View } from "./ViewSwitch";
 import { keyOf, TONE, type Bubble, type Data } from "./types";
 
@@ -105,6 +106,7 @@ export default function Home() {
       ) : (
         <Timeline mentions={data?.recent ?? []} />
       )}
+      <VolumeMeter />
     </main>
   );
 }

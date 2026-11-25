@@ -5,7 +5,7 @@ import { spawn, spawnSync } from "node:child_process";
 const URL_AUDIO = process.env.COMECHISMES_URL || "http://127.0.0.1:3000/api/audio";
 const RATE = 16000;
 const FRAME = 320; // 20 ms
-const MAX_RECORD_MS = 15000;
+const MAX_RECORD_MS = 60000; // pasado un minuto se envía ese tramo y se sigue grabando
 const SILENCE_END_MS = 1200;
 const PREROLL_MS = 400;
 const MIN_SPEECH_MS = 300; // por debajo de esto es un golpe o un clic, no una frase
@@ -98,11 +98,11 @@ ff.stdout.on("data", (chunk) => {
     frames.push(Buffer.from(frame));
     if (loud) { silentMs = 0; loudMs += 20; } else silentMs += 20;
     const total = frames.length * 20;
-    if (silentMs >= SILENCE_END_MS || total >= MAX_RECORD_MS) {
-      // Si se llegó al máximo sin silencio, el ruido de fondo subió: se ajusta para no grabar sin parar.
-      if (total >= MAX_RECORD_MS && silentMs < SILENCE_END_MS) noise = Math.max(noise, level / THRESHOLD_FACTOR);
+    const ended = silentMs >= SILENCE_END_MS;
+    if (ended || total >= MAX_RECORD_MS) {
       if (loudMs >= MIN_SPEECH_MS) send(Buffer.concat(frames));
-      frames = null;
+      frames = ended ? null : [];
+      loudMs = 0;
     }
   }
 });

@@ -160,6 +160,10 @@ ipcMain.on("phrase", (_event, pcm) => {
     fetch(`${baseUrl}/api/audio`, { method: "POST", headers: { "Content-Type": "audio/wav" }, body }).catch(() => {}),
   );
 });
+// El nivel de volumen va del micrófono (ventana oculta) al medidor de la ventana principal.
+ipcMain.on("level", (_event, data) => {
+  if (win && !win.isDestroyed()) win.webContents.send("level", data);
+});
 ipcMain.on("mic-error", (_event, message) => dialog.showErrorBox("Comechismes", `No pude abrir el micrófono: ${message}`));
 
 function menu() {

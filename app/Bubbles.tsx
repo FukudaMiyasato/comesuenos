@@ -69,7 +69,7 @@ export default function Bubbles({ bubbles, pulsing }: { bubbles: Bubble[]; pulsi
           n = { x: cx + Math.cos(a) * d, y: cy + Math.sin(a) * d, vx: 0, vy: 0, r: 0, target: 0, category: c.category };
           map.set(c.name, n);
         }
-        n.target = c.name === selected ? big : Math.max(30, k * Math.sqrt(c.count));
+        n.target = c.name === selected ? big : Math.max(42, k * Math.sqrt(c.count));
       }
 
       const list = [...map.entries()];
@@ -178,7 +178,10 @@ export default function Bubbles({ bubbles, pulsing }: { bubbles: Bubble[]; pulsi
                 }}
                 aria-label={`${c.category}, ${WORD[c.sentiment]}: ${c.count} ${c.count === 1 ? "vez" : "veces"}`}
               >
-                <span className="name">{c.category}</span>
+                {/* Cuanto más larga la frase, más pequeña la letra, para que quepa dentro del círculo. */}
+                <span className="name" style={{ "--f": Math.min(0.3, 1.2 / Math.sqrt(c.category.length)) } as React.CSSProperties}>
+                  {c.category}
+                </span>
                 <span className="count">{c.count}</span>
               </button>
             )}
