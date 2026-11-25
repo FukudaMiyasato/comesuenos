@@ -1,0 +1,30 @@
+{
+  "name": "comechismes-desktop",
+  "productName": "Comechismes",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Comechismes: escucha, clasifica y muestra, todo en este equipo",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "engines": "python3 scripts/bundle-engines.py",
+    "dist": "sh scripts/build.sh"
+  },
+  "devDependencies": {
+    "electron": "^45.5.0",
+    "electron-builder": "^26.18.0"
+  },
+  "build": {
+    "appId": "pe.comechismes.app",
+    "productName": "Comechismes",
+    "files": ["main.js", "preload.js", "listener.html", "listener.js", "vad-worklet.js", "setup.html"],
+    "mac": {
+      "target": "dir",
+      "identity": null,
+      "category": "public.app-category.business",
+      "extendInfo": {
+        "NSMicrophoneUsageDescription": "Comechismes escucha el ambiente para clasificar de qué se habla. El audio no se guarda ni sale de este equipo."
+      }
+    }
+  }
+}

@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="es">
+<meta charset="utf-8" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'" />
+<title>Comechismes</title>
+<style>
+  body { margin: 0; height: 100vh; display: grid; place-items: center; font: 15px/1.5 -apple-system, system-ui, sans-serif; color: #2b2f38; background: #fff; }
+  main { width: min(440px, 80vw); text-align: center; }
+  .eyes { display: flex; gap: 26px; justify-content: center; margin-bottom: 34px; }
+  .eyes i { width: 46px; height: 62px; border-radius: 18px; background: #2b2f38; animation: blink 4s infinite; }
+  @keyframes blink { 0%, 92%, 100% { transform: scaleY(1); } 96% { transform: scaleY(0.08); } }
+  .bar { height: 6px; border-radius: 3px; background: #e8ebf1; overflow: hidden; margin: 18px 0 10px; }
+  .bar b { display: block; height: 100%; width: 0; background: #a6c8f5; transition: width 0.25s; }
+  small { color: #8a90a0; }
+</style>
+<main>
+  <div class="eyes"><i></i><i></i></div>
+  <div id="text">Preparando…</div>
+  <div class="bar"><b id="bar"></b></div>
+  <small>La primera vez se descargan los modelos (3,7 GB). Después funciona sin internet.</small>
+</main>
+<script>
+  window.comechismes.onStatus(({ text, progress }) => {
+    document.getElementById("text").textContent = text;
+    document.getElementById("bar").style.width = progress == null ? "100%" : `${(progress * 100).toFixed(1)}%`;
+  });
+</script>
+</html>

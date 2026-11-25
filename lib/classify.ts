@@ -10,7 +10,7 @@ function provider(): Provider | null {
   const forced = process.env.CLASSIFY_MODEL ? [process.env.CLASSIFY_MODEL] : [];
   if (localAI()) {
     return {
-      name: "Local (Ollama)",
+      name: "Local (llama.cpp u Ollama)",
       url: process.env.LOCAL_LLM_URL || "http://127.0.0.1:11434/v1/chat/completions",
       key: "",
       models: [...forced, "qwen2.5:3b"],

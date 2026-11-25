@@ -1,3 +1,5 @@
+import { readFileSync, renameSync, writeFileSync } from "node:fs";
+
 // Por motivos legales NO se guarda ni el audio ni el texto transcrito.
 // Lo único que persiste es: categoría + sentimiento + fecha de cada vez que se habló de ella.
 
@@ -43,8 +45,30 @@ async function redis<T>(...command: (string | number)[]): Promise<T> {
   return ((await res.json()) as { result: T }).result;
 }
 
-// Sin Redis (desarrollo local) se guarda en memoria del proceso.
-const g = globalThis as unknown as { __comechismesData?: Data; __comechismesSettings?: Settings };
+// Sin Redis se guarda en memoria del proceso y, si se define COMECHISMES_DATA_FILE (app de escritorio),
+// también en ese archivo JSON, para que los datos sobrevivan al cerrar la app.
+const g = globalThis as unknown as { __comechismesData?: Data; __comechismesSettings?: Settings; __comechismesLoaded?: boolean };
+
+const dataFile = process.env.COMECHISMES_DATA_FILE;
+
+function loadFile(): void {
+  if (!dataFile || g.__comechismesLoaded) return;
+  g.__comechismesLoaded = true;
+  try {
+    const saved = JSON.parse(readFileSync(dataFile, "utf8")) as { data?: Data; settings?: Settings };
+    if (saved.data) g.__comechismesData = { ...emptyData(), ...saved.data };
+    if (saved.settings) g.__comechismesSettings = { ...defaults, ...saved.settings };
+  } catch {
+    // Primera vez (no existe) o archivo dañado: se empieza de cero.
+  }
+}
+
+function saveFile(): void {
+  if (!dataFile) return;
+  const tmp = `${dataFile}.tmp`;
+  writeFileSync(tmp, JSON.stringify({ data: g.__comechismesData, settings: g.__comechismesSettings }));
+  renameSync(tmp, dataFile); // escritura atómica: nunca queda un archivo a medias
+}
 
 const emptyData = (): Data => ({ bubbles: {}, recent: [] });
 const defaults: Settings = { listening: true, fake: false };
@@ -57,24 +81,32 @@ export async function readAll(): Promise<{ data: Data; settings: Settings }> {
     const [d, s] = await redis<(string | null)[]>("MGET", DATA_KEY, SETTINGS_KEY);
     return { data: parse(d, emptyData()), settings: parse(s, defaults) };
   }
+  loadFile();
   return { data: g.__comechismesData ?? emptyData(), settings: g.__comechismesSettings ?? defaults };
 }
 
 export async function getSettings(): Promise<Settings> {
   if (persistent) return parse(await redis<string | null>("GET", SETTINGS_KEY), defaults);
+  loadFile();
   return g.__comechismesSettings ?? defaults;
 }
 
 export async function updateSettings(patch: Partial<Settings>): Promise<Settings> {
   const next = { ...(await getSettings()), ...patch };
   if (persistent) await redis("SET", SETTINGS_KEY, JSON.stringify(next));
-  else g.__comechismesSettings = next;
+  else {
+    g.__comechismesSettings = next;
+    saveFile();
+  }
   return next;
 }
 
 async function writeData(data: Data): Promise<void> {
   if (persistent) await redis("SET", DATA_KEY, JSON.stringify(data));
-  else g.__comechismesData = data;
+  else {
+    g.__comechismesData = data;
+    saveFile();
+  }
 }
 
 export const bubbleKey = (category: string, sentiment: Sentiment) => `${category}|${sentiment}`;
@@ -112,5 +144,8 @@ export function toBubbles(data: Data): Bubble[] {
 /** Borra todos los datos, incluidas las claves antiguas que guardaban textos. */
 export async function clearAll(): Promise<void> {
   if (persistent) await redis("DEL", DATA_KEY, ...LEGACY_KEYS);
-  else g.__comechismesData = emptyData();
+  else {
+    g.__comechismesData = emptyData();
+    saveFile();
+  }
 }

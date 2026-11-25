@@ -11,3 +11,6 @@ firmware/include/secrets.h
 next-env.d.ts
 .DS_Store
 local/models/
+desktop/node_modules/
+desktop/dist/
+desktop/engines/

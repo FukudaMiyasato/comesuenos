@@ -63,6 +63,21 @@ npm run local
 - `MIC="nombre o índice"` elige otro micrófono; `CLASSIFY_MODEL=qwen2.5:7b` usa un modelo de clasificación más grande.
 - Sin las variables de Upstash en `.env.local`, los datos viven en memoria y se pierden al detener la web.
 
+## App de escritorio para enviar a otra persona (`desktop/`)
+
+Empaqueta lo mismo en una app de Mac: escucha con el micrófono, transcribe y clasifica con modelos locales y muestra los gráficos en su propia ventana. Los datos se guardan en el equipo de cada persona (`~/Library/Application Support/Comechismes/datos.json`).
+
+```bash
+brew install whisper.cpp llama.cpp
+cd desktop && npm install && npm run dist
+```
+
+El resultado es `desktop/dist/Comechismes-mac-arm64.zip` (unos 140 MB). La primera vez que se abre descarga los modelos (3,7 GB); después funciona sin internet.
+
+- Solo para Mac con Apple Silicon. Los motores se copian de Homebrew, así que la app exige la misma versión de macOS (o posterior) que la Mac donde se construyó.
+- No está firmada con una cuenta de Apple: quien la reciba debe autorizarla la primera vez en Ajustes del Sistema → Privacidad y seguridad → «Abrir igualmente».
+- Menú Ver: Gráficos (⌘1), Administración (⌘2), Documentación (⌘3).
+
 ## Firmware (`firmware/`, PlatformIO + Arduino)
 
 Placa: ESP32-S3 N16R8 tipo "bread-compact" — OLED SSD1306 (SDA 41, SCL 42),
